@@ -1,0 +1,77 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints
+
+# VSCode or PyCharm config files
+.vscode/
+.idea/
+
+# Log files
+logs/
+*.log
+
+# Data files
+data/raw/
+data/processed/
+
+# Environment variable or secrets files
+.env
+.env.*
+
+# OS junk files
+.DS_Store
+Thumbs.db
+
+# Compiled binary or cache
+*.out
+*.exe
+*.bak
+
+# Pip tools
+pip-log.txt
+
+# Coverage tools
+.coverage
+coverage.xml
+htmlcov/
+
+# Pytest
+.cache/
+
+# MyPy
+.mypy_cache/
+
+# Pylint
+.pylint.d/
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+
+# Python Bytecode Cache
+__pycache__/
+**/__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.pyc
+
+**/new_cache/
+**/cache/
+*.bin
+*.pt
+*.ckpt

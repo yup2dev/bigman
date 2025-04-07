@@ -1,0 +1,11 @@
+people:
+  Trump:
+    keywords:
+      - Trump
+      - Donald Trump
+      - the Trump administration
+  Biden:
+    keywords:
+      - Biden
+      - Joe Biden
+      - the Biden administration

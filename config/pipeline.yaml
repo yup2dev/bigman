@@ -1,0 +1,7 @@
+site_key: nyt
+keywords:
+  - trump
+person: Trump
+limit: 30
+top_k: 3
+output: trump_articles.json

@@ -57,7 +57,7 @@ def load_json(filepath: str, encoding: str = "utf-8") -> dict:
         return {}
 
 
-def load_articles_from_urls(urls: List[str], delay: float = 1.0) -> List[Dict]:
+def load_articles_from_urls(urls: List[str], delay: float = 3.0) -> List[Dict]:
     articles = []
     for url in urls:
         print(f"📥 기사 수집 중: {url}")

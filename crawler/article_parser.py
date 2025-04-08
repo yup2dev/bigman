@@ -1,13 +1,16 @@
 from newspaper import Article
 from typing import List, Dict
-from datetime import datetime
 
 def parse_articles(urls: List[str]) -> List[Dict]:
+    seen_urls = set()
     articles = []
 
     for url in urls:
         if not isinstance(url, str) or not url.startswith("http"):
             print(f"⚠️ Skipping invalid URL: {url}")
+            continue
+        if url in seen_urls:
+            print(f"⚠️ Duplicate URL skipped: {url}")
             continue
 
         try:
@@ -25,6 +28,7 @@ def parse_articles(urls: List[str]) -> List[Dict]:
                 ),
                 "source": article.source_url or url.split("/")[2]
             })
+            seen_urls.add(url)
 
         except Exception as e:
             print(f"❌ Failed to parse {url}: {e}")

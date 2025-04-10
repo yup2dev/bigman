@@ -1,8 +1,10 @@
 import re
 from typing import List, Dict, Any, Optional
 import nltk
+import spacy
+from newspaper.nlp import summarize
 from nltk.tokenize import sent_tokenize
-from transformers import pipeline, AutoTokenizer
+from transformers import pipeline, AutoTokenizer, AutoModelForSeq2SeqLM, BertForSequenceClassification, BertTokenizer
 import torch
 
 try:
@@ -12,17 +14,29 @@ except LookupError:
 
 
 class NLPProcessor:
-    def __init__(self, summarizer_model: str = "sshleifer/distilbart-cnn-12-6"):
-        device = 0 if torch.cuda.is_available() else -1
-        self.summarizer = pipeline("summarization", model=summarizer_model, device=device)
+    def __init__(self, summarizer_model: str = "sshleifer/distilbart-cnn-12-6", bert_model: str = "bert-base-uncased"):
+        self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
+        # Summarizer 초기화
+        self.summarizer = pipeline("summarization", model=summarizer_model,
+                                   device=0 if torch.cuda.is_available() else -1)
         self.tokenizer = AutoTokenizer.from_pretrained(summarizer_model)
-        self.cause_effect_keywords = [
-            "because", "due to", "as a result", "therefore", "hence", "consequently"
-        ]
+
+        # spaCy 모델 초기화
+        try:
+            self.nlp = spacy.load("en_core_web_sm")
+        except OSError as e:
+            raise OSError(
+                f"Failed to load 'en_core_web_sm'. Install with: python -m spacy download en_core_web_sm. Error: {e}"
+            )
+
+        # BERT 모델 초기화 (fine-tuned for cause-effect classification)
+        self.bert_tokenizer = BertTokenizer.from_pretrained(bert_model)
+        self.bert_model = BertForSequenceClassification.from_pretrained(bert_model, num_labels=2).to(self.device)
+
         self.max_input_tokens = 1024
 
     def clean_text(self, text: str, remove_patterns: Optional[List[str]] = None) -> str:
-        """불필요한 패턴 제거 및 텍스트 정리"""
         text = re.sub(r'\s+', ' ', text)
         default_patterns = [r'\[[^\]]*\]', r'\([^\)]*\)', r'(뉴스1|연합뉴스|Reuters|AP)']
         patterns = remove_patterns if remove_patterns else default_patterns
@@ -31,7 +45,6 @@ class NLPProcessor:
         return text.strip()
 
     def chunk_text(self, text: str, max_tokens: Optional[int] = None) -> List[str]:
-        """토큰 수 기준으로 긴 텍스트를 분할"""
         max_tokens = max_tokens or (self.max_input_tokens - 50)
         tokens = self.tokenizer.encode(text, add_special_tokens=False)
         chunks, current_chunk, current_length = [], [], 0
@@ -50,7 +63,6 @@ class NLPProcessor:
         return [chunk.strip() for chunk in chunks if chunk.strip()]
 
     def summarize(self, text: str, max_length: int = 130, min_length: int = 30) -> str:
-        """요약 함수"""
         if not text or len(text.split()) < 20:
             return text
 
@@ -65,39 +77,81 @@ class NLPProcessor:
             self.summarizer(chunk, max_length=max_length, min_length=min_length, do_sample=False)[0]['summary_text']
             for chunk in chunks
         ]
-        return ' '.join(dict.fromkeys(summaries))  # 중복 제거
+        return ' '.join(dict.fromkeys(summaries))
 
     def extract_cause_effect(self, text: str) -> List[Dict[str, str]]:
-        """원인-결과 관계 추출"""
-        try:
-            sentences = list(set(sent_tokenize(text)))
-        except LookupError:
-            nltk.download('punkt')
-            sentences = list(set(sent_tokenize(text)))
+        results = []
 
-        pairs = []
-        for sentence in sentences:
-            for keyword in self.cause_effect_keywords:
-                pattern = re.compile(rf"\b{re.escape(keyword)}\b", re.IGNORECASE)
-                match = pattern.search(sentence)
+        # 1. spaCy 기반 추출
+        sentences = sent_tokenize(text)
+        trigger_words = [
+            "because", "since", "as", "due to", "resulting in", "owing to", "thanks to", "leads to", "despite"
+        ]
+        for sent in sentences:
+            doc = self.nlp(sent)
+            for token in doc:
+                if token.text.lower() in trigger_words:
+                    # 절 단위로 분리하여 원인과 결과 추출
+                    clauses = [clause.text for clause in doc.sents]
+                    if len(clauses) > 1:
+                        cause = clauses[1].strip()
+                        effect = clauses[0].strip()
+                        results.append({"cause": cause, "effect": effect, "source": "spacy"})
+                    else:
+                        # 단일 절에서 추출
+                        cause = " ".join([t.text for t in doc[token.i + 1:]]).strip()
+                        effect = " ".join([t.text for t in doc[:token.i]]).strip()
+                        if cause and effect:
+                            results.append({"cause": cause, "effect": effect, "source": "spacy"})
+
+        # 2. 패턴 기반 추출
+        patterns = [
+            (r"(.+?) because (.+?)\.", "effect", "cause"),
+            (r"(.+?) due to (.+?)\.", "effect", "cause"),
+            (r"(.+?) led to (.+?)\.", "cause", "effect"),
+            (r"(.+?) as a result of (.+?)\.", "effect", "cause"),
+            (r"(.+?) resulted in (.+?)\.", "cause", "effect"),
+            (r"(.+?) as a consequence of (.+?)\.", "effect", "cause"),
+            (r"(.+?) caused by (.+?)\.", "effect", "cause"),
+            (r"(.+?) owing to (.+?)\.", "effect", "cause"),
+            (r"(.+?) thanks to (.+?)\.", "effect", "cause"),
+            (r"(.+?) despite (.+?)\.", "effect", "cause")
+        ]
+        for sent in sentences:
+            for pattern, effect_label, cause_label in patterns:
+                match = re.search(pattern, sent)
                 if match:
-                    idx = match.start()
-                    cause, effect = sentence[:idx].strip(), sentence[idx:].strip()
-                    if cause and effect:
-                        pairs.append({
-                            "cause": cause,
-                            "effect": effect,
-                            "keyword": match.group(),
-                            "full_sentence": sentence
-                        })
-                    break
-        return pairs
+                    cause = match.group(2) if cause_label == "cause" else match.group(1)
+                    effect = match.group(1) if effect_label == "effect" else match.group(2)
+                    results.append({"cause": cause, "effect": effect, "source": "pattern"})
+
+        # 3. BERT 기반 검증
+        for sent in sentences:
+            inputs = self.bert_tokenizer(sent, return_tensors="pt", truncation=True, padding=True).to(self.device)
+            with torch.no_grad():
+                logits = self.bert_model(**inputs).logits
+                prob = torch.softmax(logits, dim=1)[0][1].item()
+            if prob > 0.5:  # 원인-결과 관계로 판단될 경우
+                results.append({"cause": "BERT_detected_cause", "effect": sent, "confidence": prob, "source": "bert"})
+
+        # 4. 중복 제거 및 후처리
+        seen = set()
+        final_results = []
+        priority = {"pattern": 1, "spacy": 2, "bert": 3}
+        sorted_results = sorted(results, key=lambda x: priority.get(x["source"], 4))
+
+        for r in sorted_results:
+            key = (r["cause"], r["effect"])
+            if key not in seen:
+                final_results.append(r)
+                seen.add(key)
+
+        return final_results
 
     def process_article(self, article: Dict[str, Any]) -> Dict[str, Any]:
-        """기사 딕셔너리를 받아 요약 + 원인-결과 추출 결과 포함된 결과 반환"""
         content = article.get("content", "") or article.get("text", "")
         cleaned = self.clean_text(content)
-        summary = self.summarize(cleaned)
+        summary = self.summarize(cleaned) if summarize else ""
         cause_effects = self.extract_cause_effect(cleaned)
         return {
             **article,
@@ -107,10 +161,8 @@ class NLPProcessor:
         }
 
     def process_articles(self, articles: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        """중복 URL 제거 후 기사 리스트 전체 처리"""
         seen_urls = set()
         results = []
-
         for article in articles:
             url = article.get("url")
             if not url or url in seen_urls:
@@ -125,5 +177,11 @@ class NLPProcessor:
             })
             results.append(processed)
             seen_urls.add(url)
-
         return results
+
+
+if __name__ == "__main__":
+    nlp_processor = NLPProcessor()
+    sample_text = "The event was canceled because it rained heavily."
+    result = nlp_processor.extract_cause_effect(sample_text)
+    print("Final result:", result)

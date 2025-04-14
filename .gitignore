@@ -1,10 +1,11 @@
-# Byte-compiled / optimized / DLL files
+# Python
 __pycache__/
 *.py[cod]
 *$py.class
-
-# C extensions
 *.so
+*.pyo
+*.pyd
+*.pyc
 
 # Virtual environments
 .venv/
@@ -12,66 +13,78 @@ venv/
 ENV/
 env/
 
-# Jupyter Notebook checkpoints
-.ipynb_checkpoints
-
-# VSCode or PyCharm config files
+# IDE
 .vscode/
 .idea/
+*.swp
+*.swo
 
-# Log files
+# Logs and databases
 logs/
 *.log
+*.sqlite
+*.db
 
-# Data files
+# Data and models
 data/raw/
 data/processed/
+*.pt
+*.ckpt
+*.bin
+*.h5
+*.pkl
+*.joblib
+tune/cause_effect_model/
+tune/cause_effect_model/**/*
+tune/cause_effect_model/*
+new_cache/
+new_cache/**/*
+new_cache/*
 
-# Environment variable or secrets files
+# Environment variables
 .env
 .env.*
 
-# OS junk files
+# OS
 .DS_Store
 Thumbs.db
+desktop.ini
 
-# Compiled binary or cache
-*.out
-*.exe
-*.bak
-
-# Pip tools
-pip-log.txt
-
-# Coverage tools
-.coverage
-coverage.xml
-htmlcov/
-
-# Pytest
-.cache/
-
-# MyPy
-.mypy_cache/
-
-# Pylint
-.pylint.d/
-
-# Build artifacts
+# Build and distribution
 build/
 dist/
 *.egg-info/
 
-# Python Bytecode Cache
+# Testing and coverage
+.coverage
+coverage.xml
+htmlcov/
+
+# Cache directories
+.cache/
+.mypy_cache/
+.pylint.d/
 __pycache__/
 **/__pycache__/
-*.py[cod]
-*.pyo
-*.pyd
-*.pyc
+.cache/
+**/.cache/
+*.cache
+.cache/
+.cache.mypy/
+.cache.pytest/
+.cache.python/
+.cache.python3/
+.cache.python3.8/
+.cache.python3.9/
+.cache.python3.10/
+.cache.python3.11/
+.cache.python3.12/
 
-**/new_cache/
-**/cache/
-*.bin
-*.pt
-*.ckpt
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb
+
+# Temporary files
+*.bak
+*.tmp
+*.temp

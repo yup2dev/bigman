@@ -19,7 +19,7 @@ def build_dataset(site_key="cnn", keywords=["trump"], limit=10):
     for article in articles:
         cleaned_text = nlp.clean_text(article["text"])
         summary = nlp.summarize(cleaned_text)
-        cause_effects = nlp.extract_cause_effect(cleaned_text, target_person=keywords[0])
+        cause_effects = nlp.extract_cause_effect(cleaned_text)
 
         dataset.append({
             "url": article["url"],

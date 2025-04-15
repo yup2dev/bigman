@@ -2,11 +2,11 @@ import re
 import spacy
 import torch
 import os
-from typing import List, Dict, Any
+# import logging
+from typing import List, Dict, Any, Optional
 from nltk.tokenize import sent_tokenize
 from sentence_transformers import SentenceTransformer
-from transformers import pipeline, AutoTokenizer, T5ForConditionalGeneration
-from sklearn.metrics.pairwise import cosine_similarity
+from transformers import pipeline, AutoTokenizer, T5ForConditionalGeneration, T5Tokenizer
 
 
 class NLPProcessor:
@@ -21,6 +21,7 @@ class NLPProcessor:
         self._initialize_bert_models(bert_model, fine_tuned_bert_path)
         self._initialize_sentence_transformer()
         self._initialize_trigger_map()
+        self._initialize_cause_effect_model()
 
     def _initialize_summarizer(self, model_name: str):
         """텍스트 요약 파이프라인을 초기화합니다."""
@@ -78,46 +79,65 @@ class NLPProcessor:
             "despite": ("effect", "cause")
         }
 
-    def clean_text(self, text: str) -> str:
-        """입력 텍스트에서 특수 문자와 여분의 공백을 제거합니다."""
-        text = re.sub(r'[^\w\s.,!?]', '', text)
-        return re.sub(r"\s+", " ", text).strip()
+    def _initialize_cause_effect_model(self):
+        """미세조정된 T5 모델을 초기화합니다."""
+        try:
+            # 현재 파일의 디렉토리를 기준으로 모델 경로 설정
+            current_dir = os.path.dirname(os.path.abspath(__file__))
+            model_path = os.path.join(current_dir, "..", "tune", "cause_effect_model")
+            
+            if os.path.exists(model_path):
+                print("미세조정된 T5 모델 로드 중...")
+                self.cause_effect_model = T5ForConditionalGeneration.from_pretrained(model_path)
+                self.cause_effect_tokenizer = T5Tokenizer.from_pretrained(model_path)
+                self.cause_effect_model.to(self.device)
+                self.cause_effect_model.eval()
+                print("미세조정된 T5 모델 로드 완료!")
+            else:
+                print(f"미세조정된 T5 모델을 찾을 수 없습니다: {model_path}")
+                print("기본 추출 방법을 사용합니다.")
+                self.cause_effect_model = None
+                self.cause_effect_tokenizer = None
+        except Exception as e:
+            print(f"미세조정된 T5 모델 초기화 실패: {str(e)}")
+            self.cause_effect_model = None
+            self.cause_effect_tokenizer = None
+
+    def clean_text(self, text: str, remove_patterns: Optional[List[str]] = None) -> str:
+        """입력 텍스트를 정리합니다.
+        
+        Args:
+            text: 정리할 텍스트
+            remove_patterns: 제거할 정규식 패턴 리스트 (기본값: 대괄호와 괄호 안의 내용)
+            
+        Returns:
+            정리된 텍스트
+        """
+        text = re.sub(r'\s+', ' ', text)
+        default_patterns = [r'\[[^\]]*\]', r'\([^\)]*\)']
+        patterns = remove_patterns if remove_patterns else default_patterns
+        for pattern in patterns:
+            text = re.sub(pattern, '', text, flags=re.IGNORECASE)
+        return text.strip()
 
     def summarize(self, text: str, max_length: int = 130, min_length: int = 30) -> str:
         """입력 텍스트의 요약을 생성합니다."""
-        # 텍스트가 너무 짧은 경우 원본 반환
         if not text or len(text.split()) < 20:
             return text
 
-        try:
-            # 입력 텍스트가 너무 긴 경우 처리
-            if len(text.split()) > 1024:  # 모델의 최대 입력 길이 제한
-                text = " ".join(text.split()[:1024])
-                print("경고: 입력 텍스트가 1024 단어로 잘렸습니다")
+        tokenized_input = self.summarizer.tokenizer.encode(text, add_special_tokens=True)
+        max_input_tokens = self.summarizer.tokenizer.model_max_length
+        if len(tokenized_input) <= max_input_tokens:
+            adjusted_max_length = min(max_length, max(len(tokenized_input) // 2, min_length))
+            summary = self.summarizer(text, max_length=adjusted_max_length, min_length=min_length, do_sample=False)
+            return summary[0]['summary_text']
 
-            # 텍스트 토큰화 및 길이 조정
-            tokenized_input = self.tokenizer.encode(text, add_special_tokens=True)
-            if len(tokenized_input) <= self.max_input_tokens:
-                # 토큰 길이에 맞게 요약 길이 조정
-                adjusted_max_length = min(max_length, max(len(tokenized_input) // 2, min_length))
-                summary = self.summarizer(text, max_length=adjusted_max_length, min_length=min_length, do_sample=False)
-                return summary[0]['summary_text']
-
-            # 긴 텍스트를 청크로 나누어 처리
-            chunks = self.chunk_text(text)
-            summaries = [
-                self.summarizer(chunk, max_length=max_length, min_length=min_length, do_sample=False)[0]['summary_text']
-                for chunk in chunks
-            ]
-            
-            # 중복 제거 후 요약문 결합
-            return ' '.join(dict.fromkeys(summaries))
-            
-        except Exception as e:
-            print(f"요약 실패: {str(e)}")
-            print(f"입력 텍스트 길이: {len(text.split())} 단어")
-            print(f"첫 100자: {text[:100]}...")
-            return text[:max_length] + "..."
+        chunks = self.chunk_text(text)
+        summaries = [
+            self.summarizer(chunk, max_length=max_length, min_length=min_length, do_sample=False)[0]['summary_text']
+            for chunk in chunks
+        ]
+        return ' '.join(dict.fromkeys(summaries))
 
     def process_articles(self, articles: List[Dict[str, Any]], target_person: str) -> List[Dict[str, Any]]:
         """여러 기사를 처리하여 인과 관계를 추출합니다."""
@@ -163,7 +183,7 @@ class NLPProcessor:
 
         cleaned = self.clean_text(content)
         summary = self.summarize(cleaned)
-        cause_effects = self.extract_cause_effect(cleaned, target_person)
+        cause_effects = self.extract_cause_effect(cleaned)
 
         return {
             "title": article.get("title", ""),
@@ -174,31 +194,32 @@ class NLPProcessor:
             "person": target_person
         }
 
-    def extract_cause_effect(self, text: str, target_person: str) -> List[Dict[str, str]]:
-        """여러 방법을 사용하여 인과 관계를 추출합니다."""
+    def extract_cause_effect(self, text: str) -> List[Dict]:
+        """텍스트에서 인과 관계를 추출합니다."""
         if not text:
             return []
 
-        sentences = sent_tokenize(text)
-        raw_results = []
+        # 미세조정된 모델을 우선적으로 사용
+        if self.cause_effect_model:
+            try:
+                results = self._extract_cause_effect_finetuned(text)
+                if results:  # 결과가 있으면 반환
+                    return results
+            except Exception as e:
+                print(f"미세조정된 모델 추출 실패: {str(e)}")
 
-        # 방법 1: 패턴 기반 추출
-        raw_results.extend(self._extract_by_pattern(sentences))
+        # 미세조정된 모델 실패 시 패턴 매칭과 Spacy 조합 사용
+        pattern_results = self._extract_cause_effect_pattern(text)
+        spacy_results = self._extract_cause_effect_spacy(text)
+        
+        # 결과 통합 및 중복 제거
+        all_results = pattern_results + spacy_results
+        return self._deduplicate_results(all_results)
 
-        # 방법 2: spaCy 기반 추출
-        raw_results.extend(self._extract_by_spacy(sentences))
-
-        # 방법 3: BERT 기반 분류
-        raw_results.extend(self._extract_by_bert(sentences))
-
-        # 후처리
-        final_results = self._post_process_results(raw_results, target_person)
-        return final_results
-
-    def _extract_by_pattern(self, sentences: List[str]) -> List[Dict[str, str]]:
+    def _extract_cause_effect_pattern(self, text: str) -> List[Dict]:
         """정규식 패턴을 사용하여 인과 관계 쌍을 추출합니다."""
         results = []
-        for sent in sentences:
+        for sent in sent_tokenize(text):
             for trig, (effect_label, cause_label) in self.trigger_map.items():
                 pattern = fr"(.+?)\s{trig}\s(.+?)(?:\.|;|$)"
                 match = re.search(pattern, sent.lower())
@@ -214,10 +235,10 @@ class NLPProcessor:
                         })
         return results
 
-    def _extract_by_spacy(self, sentences: List[str]) -> List[Dict[str, str]]:
+    def _extract_cause_effect_spacy(self, text: str) -> List[Dict]:
         """spaCy 의존성 구문 분석을 사용하여 인과 관계 쌍을 추출합니다."""
         results = []
-        for sent in sentences:
+        for sent in sent_tokenize(text):
             doc = self.nlp(sent)
             for token in doc:
                 if token.text.lower() in self.trigger_map:
@@ -241,10 +262,10 @@ class NLPProcessor:
                             })
         return results
 
-    def _extract_by_bert(self, sentences: List[str]) -> List[Dict[str, str]]:
+    def _extract_cause_effect_finetuned(self, text: str) -> List[Dict]:
         """T5 모델을 사용하여 상세한 정보와 함께 인과 관계 쌍을 추출합니다."""
         results = []
-        for idx, sent in enumerate(sentences):
+        for idx, sent in enumerate(sent_tokenize(text)):
             # T5를 위한 입력 텍스트 준비
             input_text = f"extract cause-effect: {sent}"
             
@@ -311,27 +332,6 @@ class NLPProcessor:
                 not cause.startswith(('and', 'but', 'or')) and
                 not effect.startswith(('and', 'but', 'or')))
 
-    def _post_process_results(self, raw_results: List[Dict], target_person: str) -> List[Dict]:
-        """결과를 중복 제거하고 필터링합니다."""
-        # 중복 제거
-        unique_results = self._deduplicate_results(raw_results)
-
-        # 타겟 인물 필터링
-        filtered = []
-        for r in unique_results:
-            if (target_person.lower() in r["cause"].lower() or
-                    target_person.lower() in r["effect"].lower()):
-                filtered.append(r)
-                continue
-
-            # 인물 엔티티 확인
-            doc = self.nlp(r["cause"] + " " + r["effect"])
-            persons = [ent.text for ent in doc.ents if ent.label_ == "PERSON"]
-            if any(target_person.lower() in p.lower() for p in persons):
-                filtered.append(r)
-
-        return filtered
-
     def _deduplicate_results(self, results: List[Dict]) -> List[Dict]:
         """의미적 유사성을 사용하여 중복 인과 관계 쌍을 제거합니다."""
         seen = set()
@@ -354,10 +354,12 @@ class NLPProcessor:
                     f"{existing['cause']} {existing['effect']}",
                     convert_to_tensor=True
                 )
-                sim = cosine_similarity(
-                    current_embedding.reshape(1, -1),
-                    existing_embedding.reshape(1, -1)
-                )[0][0]
+
+                # PyTorch를 사용하여 코사인 유사도 계산
+                sim = torch.nn.functional.cosine_similarity(
+                    current_embedding.unsqueeze(0),
+                    existing_embedding.unsqueeze(0)
+                ).item()
 
                 if sim > 0.85:  # 유사성 임계값
                     duplicate = True
@@ -368,6 +370,25 @@ class NLPProcessor:
                 seen.add(key)
 
         return unique_results
+
+    def chunk_text(self, text: str, max_tokens: Optional[int] = None) -> List[str]:
+        """텍스트를 토큰 단위로 분할합니다."""
+        max_tokens = max_tokens or (self.summarizer.tokenizer.model_max_length - 50)
+        tokens = self.summarizer.tokenizer.encode(text, add_special_tokens=False)
+        chunks, current_chunk, current_length = [], [], 0
+
+        for token in tokens:
+            if current_length + 1 > max_tokens:
+                chunks.append(self.summarizer.tokenizer.decode(current_chunk, skip_special_tokens=True))
+                current_chunk = [token]
+                current_length = 1
+            else:
+                current_chunk.append(token)
+                current_length += 1
+
+        if current_chunk:
+            chunks.append(self.summarizer.tokenizer.decode(current_chunk, skip_special_tokens=True))
+        return [chunk.strip() for chunk in chunks if chunk.strip()]
 
 
 # Example usage

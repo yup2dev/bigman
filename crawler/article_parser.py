@@ -1,9 +1,45 @@
+import os
+import json
+import torch
 from newspaper import Article
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
+from datetime import datetime
 from typing import List, Dict
+from .utils import save_json, preprocess_text
 
-def parse_articles(urls: List[str]) -> List[Dict]:
+
+def get_embedding(texts: List[str], vectorizer=None) -> torch.Tensor:
+    if not vectorizer:
+        vectorizer = TfidfVectorizer()
+    tfidf_matrix = vectorizer.fit_transform(texts)
+    return torch.tensor(tfidf_matrix.toarray(), dtype=torch.float32)
+
+
+def is_duplicate_article(current_text: str, existing_texts: List[str], similarity_threshold: float = 0.95) -> bool:
+    if not existing_texts:
+        return False
+
+    texts = existing_texts + [current_text]
+    vectorizer = TfidfVectorizer()
+    embeddings = vectorizer.fit_transform(texts).toarray()
+
+    current_vector = embeddings[-1].reshape(1, -1)
+    existing_vectors = embeddings[:-1]
+
+    similarities = cosine_similarity(current_vector, existing_vectors)
+    max_similarity = similarities.max()
+
+    if max_similarity >= similarity_threshold:
+        print(f"⚠️ 중복 기사 감지됨 (유사도: {max_similarity:.4f})")
+        return True
+    return False
+
+
+def parse_articles(urls: List[str], existing_articles: List[Dict]) -> List[Dict]:
     seen_urls = set()
-    articles = []
+    new_articles = []
+    all_articles = existing_articles.copy()
 
     for url in urls:
         if not isinstance(url, str) or not url.startswith("http"):
@@ -18,7 +54,18 @@ def parse_articles(urls: List[str]) -> List[Dict]:
             article.download()
             article.parse()
 
-            articles.append({
+            if not article.text.strip():
+                print(f"⚠️ Skipping empty article: {url}")
+                continue
+
+            current_text = preprocess_text(article.text)
+            existing_texts = [preprocess_text(a["text"]) for a in all_articles if a.get("text")]
+
+            if is_duplicate_article(current_text, existing_texts):
+                print(f"⚠️ Skipping duplicate article: {article.title}")
+                continue
+
+            new_article = {
                 "url": url,
                 "title": article.title.strip(),
                 "text": article.text.strip(),
@@ -27,10 +74,43 @@ def parse_articles(urls: List[str]) -> List[Dict]:
                     if article.publish_date else None
                 ),
                 "source": article.source_url or url.split("/")[2]
-            })
+            }
+
+            new_articles.append(new_article)
+            all_articles.append(new_article)  # 다음 중복 검사를 위해 누적
             seen_urls.add(url)
 
         except Exception as e:
             print(f"❌ Failed to parse {url}: {e}")
 
-    return articles
+    return new_articles
+
+
+def save_articles(articles: List[Dict], site_key: str):  # site_key 추가
+    if not articles:
+        print("📝 저장할 기사가 없습니다.")
+        return
+
+    today = datetime.today().strftime('%Y-%m-%d')
+    current_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    folder_path = os.path.join(current_dir, "data", "processed", today)
+
+    os.makedirs(folder_path, exist_ok=True)
+    print(f"📁 저장 폴더: {folder_path}")
+
+    # 사이트별 파일명 생성
+    filename = f"articles_{site_key}_{today}.json"
+    file_path = os.path.join(folder_path, filename)
+
+    # 기존 기사 로드 후 추가
+    if os.path.exists(file_path):
+        with open(file_path, 'r', encoding='utf-8') as f:
+            existing_articles = json.load(f)
+        articles = existing_articles + articles
+
+    save_json(articles, file_path)
+
+    if os.path.exists(file_path):
+        print(f"✅ 기사 저장 완료: {file_path} ({len(articles)}개)")
+    else:
+        print(f"❌ 파일 저장 실패: {file_path}")

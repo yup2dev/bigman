@@ -1,11 +1,24 @@
-# Python
+# Python files and compiled outputs
 __pycache__/
 *.py[cod]
 *$py.class
-*.so
 *.pyo
 *.pyd
-*.pyc
+*.so
+
+
+# Testing, cache, and temp files
+.cache/
+.mypy_cache/
+.pylint.d/
+.pytest_cache/
+.coverage
+coverage.xml
+htmlcov/
+*.bak
+*.tmp
+*.temp
+
 
 # Virtual environments
 .venv/
@@ -13,11 +26,25 @@ venv/
 ENV/
 env/
 
-# IDE
+
+# IDE and editor settings
 .vscode/
 .idea/
 *.swp
 *.swo
+*.sublime-*
+
+
+# Jupyter notebooks
+.ipynb_checkpoints/
+*.ipynb
+
+
+# OS-generated files
+.DS_Store
+Thumbs.db
+desktop.ini
+
 
 # Logs and databases
 logs/
@@ -25,7 +52,13 @@ logs/
 *.sqlite
 *.db
 
-# Data and models
+
+# Environment variables
+.env
+.env.*
+
+
+# Data and trained model outputs
 data/raw/
 data/processed/
 *.pt
@@ -34,57 +67,14 @@ data/processed/
 *.h5
 *.pkl
 *.joblib
+
+# Model directories
 tune/cause_effect_model/
-tune/cause_effect_model/**/*
-tune/cause_effect_model/*
+tune/bart_cause_effect_model/
 new_cache/
-new_cache/**/*
-new_cache/*
 
-# Environment variables
-.env
-.env.*
 
-# OS
-.DS_Store
-Thumbs.db
-desktop.ini
-
-# Build and distribution
+# Build and distribution artifacts
 build/
 dist/
 *.egg-info/
-
-# Testing and coverage
-.coverage
-coverage.xml
-htmlcov/
-
-# Cache directories
-.cache/
-.mypy_cache/
-.pylint.d/
-__pycache__/
-**/__pycache__/
-.cache/
-**/.cache/
-*.cache
-.cache/
-.cache.mypy/
-.cache.pytest/
-.cache.python/
-.cache.python3/
-.cache.python3.8/
-.cache.python3.9/
-.cache.python3.10/
-.cache.python3.11/
-.cache.python3.12/
-
-# Jupyter
-.ipynb_checkpoints/
-*.ipynb
-
-# Temporary files
-*.bak
-*.tmp
-*.temp

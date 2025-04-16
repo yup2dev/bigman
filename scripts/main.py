@@ -1,40 +1,56 @@
 import os
+import json
+from datetime import datetime
 from crawler.url_collector import collect_urls
-from crawler.utils import load_articles_from_urls, save_json
-from analyzer.nlp_processor import NLPProcessor
-from config.constants import PROCESSED_DATA_DIR
+from crawler.article_parser import parse_articles, save_articles
+from config.constants import SITES_CONFIG_PATH
+from crawler.utils import load_site
 
 
-def build_dataset(site_key="cnn", keywords=["trump"], limit=10):
-    print("🔍 Step 1. 기사 URL 수집")
-    urls = collect_urls(site_key=site_key, keywords=keywords, limit=limit)
+def load_existing_articles(site_key: str) -> list:
+    today = datetime.today().strftime('%Y-%m-%d')
+    file_path = os.path.join("data", "processed", today, f"articles_{site_key}_{today}.json")
 
-    print("📰 Step 2. 기사 본문 수집")
-    articles = load_articles_from_urls(urls)
+    if os.path.exists(file_path):
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except Exception as e:
+            print(f"⚠️ 기존 기사 로드 실패: {e}")
+    return []
 
-    print("🧠 Step 3. NLP 처리 시작")
-    nlp = NLPProcessor()
-    dataset = []
 
-    for article in articles:
-        cleaned_text = nlp.clean_text(article["text"])
-        summary = nlp.summarize(cleaned_text)
-        cause_effects = nlp.extract_cause_effect(cleaned_text)
+def process_site(site_key: str, keywords: list, limit: int = 3):  # limit을 10으로 증가
+    print(f"\n🔍 {site_key} 사이트 기사 수집 시작")
+    try:
+        # URL 수집
+        urls = collect_urls(site_key=site_key, keywords=keywords, limit=limit)
 
-        dataset.append({
-            "url": article["url"],
-            "title": article["title"],
-            "summary": summary,
-            "cause_effects": cause_effects
-        })
+        if not urls:
+            print(f"⚠️ {site_key}에서 수집된 URL이 없습니다.")
+            return
 
-    print(f"📦 Step 4. 데이터셋 저장 중 ({len(dataset)}개)")
-    os.makedirs(PROCESSED_DATA_DIR, exist_ok=True)
-    save_path = os.path.join(PROCESSED_DATA_DIR, f"{site_key}_dataset.json")
-    save_json(dataset, save_path)
+        # 기존 기사 로드
+        existing_articles = load_existing_articles(site_key)
 
-    print(f"✅ 완료: {save_path}")
+        # 기사 파싱 및 중복 제거
+        articles = parse_articles(urls, existing_articles)
+
+        if articles:
+            save_articles(articles, site_key)  # site_key 전달
+        else:
+            print(f"⚠️ {site_key}에서 저장할 신규 기사가 없습니다.")
+    except Exception as e:
+        print(f"❌ {site_key} 처리 중 오류 발생: {e}")
+
+
+def main():
+    keywords = ["trump", "court", "indictment"]
+    sites_config = load_site(SITES_CONFIG_PATH)
+
+    for site_key in sites_config:
+        process_site(site_key, keywords)
 
 
 if __name__ == "__main__":
-    build_dataset()
+    main()

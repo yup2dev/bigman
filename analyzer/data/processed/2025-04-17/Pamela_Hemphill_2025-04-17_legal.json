@@ -1,0 +1,16 @@
+{
+  "url": "https://www.msnbc.com/trump-president-transition",
+  "title": "Trump presidential transition: Cabinet appointments, White House positions and more",
+  "text": "“I don’t want to be a part of their trying to rewrite what happened that day,” said Pamela Hemphill, a Jan. 6 defendant who was sentenced to two months in jail for her role in the Capitol riot.",
+  "published": null,
+  "source": "https://www.msnbc.com",
+  "events": [
+    {
+      "person": "Pamela Hemphill",
+      "decision": "Expressed refusal to be part of rewriting the events of Jan. 6",
+      "outcome": "Stated her stance against attempts to distort the events of the Capitol riot",
+      "context": "After being sentenced to two months in jail for her involvement in the riot",
+      "impact_type": "Legal"
+    }
+  ]
+}

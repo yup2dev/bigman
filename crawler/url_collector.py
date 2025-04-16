@@ -2,8 +2,9 @@ import os
 import requests
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin
-from config.constants import DEFAULT_HEADERS, EXCLUDED_KEYWORDS, RAW_DATA_DIR, SITES_CONFIG_PATH
-from crawler.utils import load_site_config, save_json
+
+from config.constants import DEFAULT_HEADERS, EXCLUDED_KEYWORDS, SITES_CONFIG_PATH
+from crawler.utils import load_site
 
 def is_valid_article_url(href: str, base_url: str, keywords: list) -> bool:
     if not href or any(k in href for k in EXCLUDED_KEYWORDS):
@@ -11,8 +12,8 @@ def is_valid_article_url(href: str, base_url: str, keywords: list) -> bool:
     full_url = urljoin(base_url, href)
     return any(keyword.lower() in full_url.lower() for keyword in keywords)
 
-def collect_urls(site_key: str, keywords: list = ["trump"], limit: int = 10):
-    configs = load_site_config(SITES_CONFIG_PATH)
+def collect_urls(site_key: str, keywords: list, limit: int = 10) -> list:
+    configs = load_site(SITES_CONFIG_PATH)
     site_config = configs.get(site_key)
 
     if not site_config:

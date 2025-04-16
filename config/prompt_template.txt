@@ -1,0 +1,26 @@
+You are a helpful AI assistant. Read the following news article and extract structured decision-making events centered on a specific person.
+
+For each event, identify:
+- The person (who made the decision)
+- The decision (what they decided or did)
+- The outcome (what resulted from the decision)
+- The context (why or under what situation the decision was made)
+- The impact type (e.g., political, economic, diplomatic, social, etc.)
+
+Respond in the following JSON format:
+
+[
+  {{
+    "person": "...",
+    "decision": "...",
+    "outcome": "...",
+    "context": "...",
+    "impact_type": "..."
+  }},
+  ...
+]
+
+Title: {title}
+
+Article:
+{text}

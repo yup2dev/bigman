@@ -1,67 +1,40 @@
 from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.metrics.pairwise import cosine_similarity
-import numpy as np
-from typing import List, Dict
-from analyzer.nlp_processor import NLPProcessor
 
+def calculate_tfidf_importance(articles, keyword_list):
+    # 텍스트를 소문자로 변환하여 대소문자 구분 제거
+    texts = [article['text'].lower() for article in articles]
 
-class ImportanceRanker:
-    def __init__(self, top_k=3):
-        self.top_k = top_k
+    # TF-IDF 행렬 생성
+    vectorizer = TfidfVectorizer(stop_words='english')
+    tfidf_matrix = vectorizer.fit_transform(texts)
 
-    def rank_sentences(self, sentences: List[str]) -> List[str]:
-        if len(sentences) <= self.top_k:
-            return sentences
+    # 키워드를 소문자로 변환
+    keyword_list = [keyword.lower() for keyword in keyword_list]
 
-        tfidf_matrix = self._build_tfidf_matrix(sentences)
-        similarity_matrix = cosine_similarity(tfidf_matrix)
-        scores = self._score_sentences(similarity_matrix)
-
-        top_indices = np.argsort(scores)[::-1][:self.top_k]
-        top_sentences = [sentences[i] for i in sorted(top_indices)]
-        return top_sentences
-
-    def _build_tfidf_matrix(self, sentences: List[str]):
-        vectorizer = TfidfVectorizer()
-        return vectorizer.fit_transform(sentences)
-
-    def _score_sentences(self, sim_matrix) -> np.ndarray:
-        return sim_matrix.sum(axis=1)
-
-    def rank_articles_by_time(self, articles: List[Dict], time_key: str = "published") -> List[Dict]:
-        return sorted(articles, key=lambda x: x.get(time_key, ""))
-
-
-def filter_important_articles(articles: List[Dict], ranker=None, min_len: int = 200, person: str = "Trump") -> List[
-    Dict]:
-    if ranker is None:
-        ranker = ImportanceRanker()
-
-    nlp = NLPProcessor()
-    filtered = []
-
-    for article in articles:
-        text = article.get("text", "")
-        if len(text) < min_len:
+    # 중요도 계산
+    keyword_importance = []
+    seen_urls = set()  # 중복 기사 제거를 위한 URL 저장
+    for i, article in enumerate(articles):
+        # 중복 기사 체크 (URL이 있는 경우)
+        article_url = article.get('url', '')
+        if article_url in seen_urls:
             continue
+        seen_urls.add(article_url)
 
-        cleaned_text = nlp.clean_text(text)
-        cause_effect_pairs = nlp.extract_cause_effect(cleaned_text)
+        # TF-IDF 점수 합산
+        score = 0
+        for keyword in keyword_list:
+            if keyword in vectorizer.vocabulary_:  # 키워드가 어휘 사전에 있는 경우
+                keyword_index = vectorizer.vocabulary_[keyword]
+                score += tfidf_matrix[i, keyword_index]  # 해당 키워드의 TF-IDF 점수 추가
 
-        # 타겟 인물 이름이 들어간 문장만 필터링
-        person_sentences = [
-            f"{cause} {effect}".strip()
-            for cause, effect in cause_effect_pairs
-            if person.lower() in cause.lower() or person.lower() in effect.lower()
-        ]
+        # 중요도 점수 저장
+        article['importance_score'] = score
+        if score > 0:  # 중요도 점수가 0보다 큰 기사만 추가
+            keyword_importance.append((article, score))
 
-        if not person_sentences:
-            continue
+    # 중요도 기준으로 내림차순 정렬
+    keyword_importance.sort(key=lambda x: x[1], reverse=True)
 
-        top_sentences = ranker.rank_sentences(person_sentences)
-
-        article["highlight"] = top_sentences
-        article["cause_effect_pairs"] = cause_effect_pairs
-        filtered.append(article)
-
-    return filtered
+    # 정렬된 기사 리스트 반환
+    return [article for article, _ in keyword_importance]

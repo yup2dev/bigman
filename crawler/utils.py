@@ -7,9 +7,12 @@ from newspaper import Article
 from typing import List, Dict
 import time
 
-def load_site_config(config_path):
-    with open(config_path, 'r') as f:
+def load_site(config_path: str) -> dict:
+    with open(config_path, "r", encoding="utf-8") as f:
         return yaml.safe_load(f)
+
+def preprocess_text(text: str) -> str:
+    return text.strip().lower()
 
 def filter_urls_by_keyword(urls, keywords):
     pattern = re.compile('|'.join(keywords), re.IGNORECASE)

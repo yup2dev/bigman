@@ -25,8 +25,8 @@ def process_all_articles(date=None):
     nlp_processor = NLPProcessor()
     
     # Directory paths
-    processed_dir = os.path.join("data", "processed", date)
-    analysis_dir = os.path.join("data", "analysis", date)
+    processed_dir = os.path.join("../data", "processed", date)
+    analysis_dir = os.path.join("../data", "analysis", date)
     
     if not os.path.exists(processed_dir):
         logger.warning(f"No processed directory found for date: {date}")

@@ -24,7 +24,7 @@ def save_analysis_results(results, source, date=None):
         date = datetime.now().strftime("%Y-%m-%d")
     
     # Create output directory structure
-    output_dir = os.path.join("data", "analysis", date)
+    output_dir = os.path.join("../data", "analysis", date)
     ensure_dir(output_dir)
     
     # Create filename
@@ -54,7 +54,7 @@ def load_articles(date=None):
         date = datetime.now().strftime("%Y-%m-%d")
     
     articles = {}
-    processed_dir = os.path.join("data", "processed", date)
+    processed_dir = os.path.join("../data", "processed", date)
     
     if not os.path.exists(processed_dir):
         logger.warning(f"No processed directory found for date: {date}")

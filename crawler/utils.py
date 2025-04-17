@@ -20,14 +20,6 @@ def filter_urls_by_keyword(urls, keywords):
 
 
 def save_json(data, filepath: str, ensure_dir=True, indent=2):
-    """
-    데이터를 JSON 파일로 저장한다.
-
-    :param data: 저장할 데이터 (dict 또는 list)
-    :param filepath: 저장할 경로 (예: 'data/raw/cnn_articles.json')
-    :param ensure_dir: True일 경우, 디렉토리가 없으면 생성
-    :param indent: JSON 들여쓰기
-    """
     # 디렉토리가 없으면 생성
     if ensure_dir:
         os.makedirs(os.path.dirname(filepath), exist_ok=True)
@@ -53,17 +45,17 @@ def load_json(filepath: str, encoding: str = "utf-8") -> dict:
         with open(filepath, "r", encoding=encoding) as f:
             return json.load(f)
     except FileNotFoundError:
-        print(f"❌ 파일을 찾을 수 없습니다: {filepath}")
+        print(f"Can not find file: {filepath}")
         return {}
     except json.JSONDecodeError as e:
-        print(f"❌ JSON 디코딩 실패: {filepath}, 에러: {e}")
+        print(f"Failed to Decode JSON: {filepath}, Error: {e}")
         return {}
 
 
 def load_articles_from_urls(urls: List[str], delay: float = 3.0) -> List[Dict]:
     articles = []
     for url in urls:
-        print(f"📥 기사 수집 중: {url}")
+        print(f"Collecting Articles...: {url}")
         try:
             article = Article(url)
             article.download()
@@ -74,7 +66,7 @@ def load_articles_from_urls(urls: List[str], delay: float = 3.0) -> List[Dict]:
                 "text": article.text,
                 "published": article.publish_date.isoformat() if article.publish_date else "",
             })
-            time.sleep(delay)  # 너무 빠르게 요청하면 사이트 차단 위험
+            time.sleep(delay)
         except Exception as e:
-            print(f"❌ 기사 수집 실패: {url} - {e}")
+            print(f"Failed to Collecting Articles...: {url} - {e}")
     return articles

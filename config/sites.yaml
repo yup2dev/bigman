@@ -97,3 +97,8 @@ aljazeera:
   base_url: "https://www.aljazeera.com"
   seed_urls:
     - "https://www.aljazeera.com/news/"
+
+yahoo:
+  base_url: "https://finance.yahoo.com/"
+  seed_urls:
+    - "https://finance.yahoo.com/news"

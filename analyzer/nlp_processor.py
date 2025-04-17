@@ -5,12 +5,11 @@ import logging
 import re
 from datetime import datetime
 from dotenv import load_dotenv
-import openai  # 예외 처리를 위해 필요
+import openai
 from openai import OpenAI
 import sys
 
-# 로깅 설정
-sys.stdout.reconfigure(encoding='utf-8')  # Windows에서 콘솔 유니코드 출력 오류 방지
+sys.stdout.reconfigure(encoding='utf-8')
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 handler = logging.FileHandler('nlp_processor.log')
@@ -27,7 +26,6 @@ openai_api_key = os.getenv("OPENAI_API_KEY")
 if not openai_api_key:
     raise ValueError("OPENAI_API_KEY가 .env에 정의되지 않았습니다.")
 
-# OpenAI 클라이언트 인스턴스 생성
 client = OpenAI(api_key=openai_api_key)
 
 class NLPProcessor:
@@ -38,7 +36,6 @@ class NLPProcessor:
         os.makedirs(save_dir, exist_ok=True)
 
     def _build_prompt(self, article):
-        """프롬프트 생성."""
         current_dir = os.path.dirname(os.path.abspath(__file__))
         prompt_file_path = os.path.join(current_dir, "..", "config", "prompt_template.txt")
         
@@ -58,7 +55,6 @@ class NLPProcessor:
         )
 
     def _call_gpt(self, prompt, max_retries=1, wait_time=10):
-        """GPT API 호출."""
         attempt = 0
         while attempt < max_retries:
             try:
@@ -93,14 +89,12 @@ class NLPProcessor:
         return None
 
     def _save_to_file(self, data: dict, article: dict, analysis: list) -> None:
-        """기사와 분석 결과를 인물+날짜+임팩트 유형으로 저장"""
         first_event = analysis[0] if analysis else {}
         person = re.sub(r'\s+', '_', first_event.get('person', 'unknown'))[:40]
         impact_types = first_event.get("impact_type", "unknown")
         impact_tokens = [re.sub(r'\W+', '', t.strip().lower()) for t in impact_types.split(',')]
         impact_part = "_".join(impact_tokens)[:40]
 
-        # 기사 날짜 추출 (없으면 오늘 날짜)
         pub_date = article.get("published") or datetime.today().strftime("%Y-%m-%d")
         try:
             date_str = datetime.strptime(pub_date[:10], "%Y-%m-%d").strftime("%Y-%m-%d")
@@ -117,19 +111,18 @@ class NLPProcessor:
         try:
             with open(full_path, 'w', encoding='utf-8') as f:
                 json.dump(data, f, ensure_ascii=False, indent=2)
-            logger.info(f" 저장 완료: {full_path}")
+            logger.info(f" Sava Successfully: {full_path}")
         except Exception as e:
-            logger.error(f" 저장 실패: {e}")
+            logger.error(f" Failed to Save: {e}")
 
     def _validate_response(self, result):
-        """응답 검증."""
         try:
             cleaned_result = result.strip()
             if not (cleaned_result.startswith('[') and cleaned_result.endswith(']')):
                 cleaned_result = f"[{cleaned_result}]" if cleaned_result else "[]"
 
             data = json.loads(cleaned_result)
-            logger.info(f"JSON 파싱 성공. 데이터 타입: {type(data)}")
+            logger.info(f"Successfully Parse JSON. DataType: {type(data)}")
 
             if not isinstance(data, list):
                 logger.warning("Response is not a list")
@@ -151,8 +144,8 @@ class NLPProcessor:
 
             return data
         except json.JSONDecodeError as e:
-            logger.error(f"JSON 파싱 실패: {e}")
-            logger.error(f"원본 응답: {result[:500]}...")
+            logger.error(f"Failed to Parse JSON: {e}")
+            logger.error(f"ORG resopnse: {result[:500]}...")
             return None
 
     def process_article(self, article):
@@ -166,7 +159,7 @@ class NLPProcessor:
         logger.info("GPT API call completed")
 
         if result is None:
-            logger.warning("GPT 응답이 없습니다.")
+            logger.warning("GPT no response.")
             return None
 
         validated_result = self._validate_response(result)
@@ -179,5 +172,5 @@ class NLPProcessor:
             self._save_to_file(combined_data, article, validated_result)
             return combined_data
         else:
-            logger.warning("검증 실패")
+            logger.warning("Failed to Valid")
             return None

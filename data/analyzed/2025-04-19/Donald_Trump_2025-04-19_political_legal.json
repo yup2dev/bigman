@@ -1,0 +1,35 @@
+{
+  "url": "https://www.aljazeera.com/news/2025/4/19/us-supreme-court-orders-temporary-halt-to-deportations-under-antique-law",
+  "title": "US Supreme Court orders temporary halt to deportations under antique law",
+  "text": "Block on removal of migrants without due process sets up the possibility of another challenge by the Trump administration to the power of the courts.\n\nThe United States Supreme Court has ordered a temporary halt on the deportation of two Venezuelan men using the antique wartime law invoked previously by the administration of President Donald Trump to send hundreds of people to El Salvador.\n\nThe country’s top court issued the order to pause the deportation of the men in immigration custody early on Saturday, after their lawyers filed an urgent petition citing an imminent risk of removal without due process. The ruling sets up the possibility of another challenge by the Trump administration to the power of the courts, and even a full-blown constitutional crisis.\n\n“The Government is directed not to remove any member of the putative class of detainees from the United States until further order of this Court,” the justices wrote in an unsigned order.\n\nTwo of the nine justices on the Supreme Court, conservatives Clarence Thomas and Samuel Alito, dissented from the decision.\n\nThe court issued the ruling following an emergency appeal filed by the American Civil Liberties Union (ACLU), contending that immigration authorities appeared to be moving to restart removals under the Alien Enemies Act of 1798.\n\nAdvertisement\n\nTrump’s use of the wartime legislation, last used during World War II, to deport alleged members of Venezuela’s Tren de Aragua gang by claiming they are “conducting irregular warfare” in the US has prompted a vigorous debate over the constitution’s ability to rein in executive power.\n\nThe Supreme Court had said in April that deportations could proceed only if those about to be removed had a chance to argue their case in court and were given “a reasonable time” to contest their pending removals.\n\n“We are deeply relieved that the Court has temporarily blocked the removals. These individuals were in imminent danger of spending the rest of their lives in a brutal Salvadoran prison without ever having had any due process,” ACLU lawyer Lee Gelernt said in an email to The Associated Press.\n\nThe White House has not yet commented on the ruling.\n\nTwo federal judges had refused to intervene to stop the latest deportation proceedings, and the US 5th Circuit Court of Appeals has yet to act, prompting the ACLU to file a petition directly with the Supreme Court.\n\nAccording to the ACLU, some of the men had already been loaded onto buses and were told they were to be deported.\n\nDuring a hearing on Friday, a government lawyer had said he was unaware of plans by the Department of Homeland Security (DHS) to deport the men that day, but there could be deportations on Saturday.\n\n“I’ve spoken with DHS. They are not aware of any current plans for flights tomorrow, but I have also been told to say they reserve the right to remove people tomorrow,” Justice Department lawyer Drew Ensign told a district court in a separate but related case.\n\nAdvertisement\n\nIn March, the Trump administration deported 238 alleged Venezuelan gang members and 23 members of a Salvadoran gang to a maximum-security prison in El Salvador.\n\nThe deportations took place despite a US federal judge granting a temporary suspension of the expulsions.\n\nAmong those deported was Kilmar Abrego Garcia, a resident of the US State of Maryland, who had secured a protection order preventing the process from going ahead.\n\nThe Trump administration later acknowledged that it had wrongly deported Garcia, but has refused to abide by a separate Supreme Court order to return him to the US.\n\nDemocratic Senator Chris Van Hollen, who met with Garcia in El Salvador on Thursday, said as he returned to the US that it’s “very clear that the president” is “blatantly, flagrantly … defying the order from the Supreme Court”.\n\n“This case is not only about one man, as important as that is. It is about protecting fundamental freedoms and the fundamental principle in the constitution for due process that protects everybody who resides in America,” Van Hollen said.",
+  "published": "2025-04-19 00:00:00",
+  "source": "https://www.aljazeera.com",
+  "events": [
+    {
+      "person": "Donald Trump",
+      "cause": "Use of wartime legislation to deport alleged gang members",
+      "cause_time": "During World War II",
+      "decision": "Deported alleged members of Venezuela’s Tren de Aragua gang",
+      "decision_time": "March",
+      "effect": "Prompted a vigorous debate over the constitution's ability to rein in executive power",
+      "effect_time": "",
+      "context": "Deportation of alleged gang members under the Alien Enemies Act of 1798",
+      "impact_type": "political, legal",
+      "method": "Use of wartime legislation",
+      "tone": "Controversial"
+    },
+    {
+      "person": "Donald Trump",
+      "cause": "Refusal to abide by Supreme Court order",
+      "cause_time": "",
+      "decision": "Refused to return Kilmar Abrego Garcia to the US",
+      "decision_time": "",
+      "effect": "Defying the order from the Supreme Court",
+      "effect_time": "",
+      "context": "Wrongful deportation of Garcia despite a protection order",
+      "impact_type": "political, legal",
+      "method": "Refusal to comply with court order",
+      "tone": "Defiant"
+    }
+  ]
+}

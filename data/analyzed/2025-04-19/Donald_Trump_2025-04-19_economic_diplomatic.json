@@ -1,0 +1,61 @@
+{
+  "url": "https://abcnews.go.com/US/live-updates/trump-tariffs-live-updates-semiconductor-tariffs-coming-trump/?id=120778811",
+  "title": "Trump tariffs live updates: Trump says US and China are discussing a deal",
+  "text": "President Donald Trump speaks to reporters after signing a proclamation in the Oval Office at the White House, April 17, 2025 in Washington.\n\nPresident Donald Trump speaks to reporters after signing a proclamation in the Oval Office at the White House, April 17, 2025 in Washington.\n\nPresident Donald Trump speaks to reporters after signing a proclamation in the Oval Office at the White House, April 17, 2025 in Washington.\n\nPresident Donald Trump speaks to reporters after signing a proclamation in the Oval Office at the White House, April 17, 2025 in Washington.\n\nPresident Donald Trump revealed for the first time on Thursday that the United States is in talks with China on a tariff deal. Trump said a deal could be reached in the next three to four weeks.\n\nEarlier Thursday, Trump met with Italian Premier Giorgia Meloni at the White House amid a tariff standoff with the European Union. The talks came a day after Trump met with Japanese officials and spoke with Mexican President Claudia Sheinbaum.\n\nMeanwhile, Trump is criticizing Federal Reserve Chairman Jerome Powell, saying his \"termination cannot come fast enough\" after Powell said he expects Trump's tariff policy to cause higher inflation and slower economic growth.",
+  "published": null,
+  "source": "https://abcnews.go.com",
+  "events": [
+    {
+      "person": "Donald Trump",
+      "cause": "Negotiation with China",
+      "cause_time": "Thursday",
+      "decision": "Revealed talks with China on a tariff deal",
+      "decision_time": "Thursday",
+      "effect": "Possibility of reaching a deal in the next three to four weeks",
+      "effect_time": "Future",
+      "context": "Tariff negotiations with China",
+      "impact_type": "economic, diplomatic",
+      "method": "Press briefing",
+      "tone": "Neutral"
+    },
+    {
+      "person": "Donald Trump",
+      "cause": "Tariff standoff with the European Union",
+      "cause_time": "Thursday",
+      "decision": "Met with Italian Premier Giorgia Meloni",
+      "decision_time": "Thursday",
+      "effect": "Tariff negotiations with the European Union",
+      "effect_time": "Ongoing",
+      "context": "Tariff negotiations with the European Union",
+      "impact_type": "economic, diplomatic",
+      "method": "Meeting",
+      "tone": "Neutral"
+    },
+    {
+      "person": "Donald Trump",
+      "cause": "Prior meeting with Japanese officials and Mexican President Claudia Sheinbaum",
+      "cause_time": "Wednesday",
+      "decision": "Met with Italian Premier Giorgia Meloni",
+      "decision_time": "Thursday",
+      "effect": "Continuation of diplomatic engagements",
+      "effect_time": "Ongoing",
+      "context": "Diplomatic engagements with various countries",
+      "impact_type": "diplomatic",
+      "method": "Meeting",
+      "tone": "Neutral"
+    },
+    {
+      "person": "Donald Trump",
+      "cause": "Federal Reserve Chairman's comments on tariff policy",
+      "cause_time": "Thursday",
+      "decision": "Criticized Federal Reserve Chairman Jerome Powell",
+      "decision_time": "Thursday",
+      "effect": "Call for Powell's termination",
+      "effect_time": "Immediate",
+      "context": "Disagreement over tariff policy impact",
+      "impact_type": "economic",
+      "method": "Tweet",
+      "tone": "Aggressive"
+    }
+  ]
+}

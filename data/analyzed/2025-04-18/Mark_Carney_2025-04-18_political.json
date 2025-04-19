@@ -1,0 +1,48 @@
+{
+  "url": "https://www.theguardian.com/world/2025/apr/18/were-going-to-stand-up-to-trump-says-mark-carney-in-second-canadian-election-debate",
+  "title": "‘We’re going to stand up to Trump,’ says Mark Carney in second Canadian election debate",
+  "text": "Canada’s prime minister, Mark Carney, faced sustained attacks from his Conservative rival at an election debate on Thursday but the Liberal leader sought to focus attention on what he calls Canada’s top threat: Donald Trump, the US president.\n\nMost opinion polls show Pierre Poilievre’s Conservative party trailing Carney’s Liberals ahead of the 28 April vote for Canada’s federal government.\n\nBut the race remains tight and Poilievre worked hard at the English-language debate to stem Liberal momentum that has picked up since Carney replaced Justin Trudeau as prime minister on 14 March. They also debated on Wednesday night, in French, Canada’s other official language.\n\nTrump’s trade war and annexation threats have caused broad outrage across Canada and the Tory leader has faced criticism for directing his ire entirely at the Liberals instead of attacking Washington.\n\nAs the campaign has evolved, Poilievre has increasingly sought to do both: condemning Trump while accusing the Liberals of weakening the economy during Trudeau’s decade in power and leaving Canada vulnerable to hostile US policies.\n\nHe continued that strategy at Thursday’s debate, charging the Liberals had given “Donald Trump and the US a near monopoly over our energy” by refusing to build pipelines that could allow Canadian oil to be exported abroad.\n\nPoilievre, a 45-year-old who has served in parliament for two decades, consistently tried to brand Carney as an extension of Trudeau, who became deeply unpopular toward the end of his tenure. “The question you have to ask is, after a decade of Liberal promises, can you afford food? Is your housing more affordable than it used to be?” Poilievre asked.\n\n“How can we possibly believe that you [Carney] are any different than the previous 10 years of Liberal government?” Poilievre further said, repeatedly saying that Carney had served as “Justin Trudeau’s economic adviser”.\n\nAddressing the Conservative leader, Carney said: “I know you want to be running against Justin Trudeau. Justin Trudeau isn’t here.”\n\nThroughout the night, Carney tried to refocus attention on Trump.\n\n“The biggest risk we have to this economy is Donald Trump,” said the 60-year-old former central banker, who has never served in parliament or held a publicly elected office.\n\nTrump, he added, “is trying to break us so he can own us”.\n\n“We’re all going to stand up against Donald Trump. I’m ready.”\n\nCarney also took fire from the two other party leaders on stage, the head of the leftwing New Democratic party, Jagmeet Singh, and the leader of the Quebec separatist Bloc Quebecois, Yves-Francois Blanchet.\n\nBoth hit Carney over his years in the private sector, including with the major Canadian corporation Brookfield, questioning whether the Liberal leader would advocate for workers given his background.\n\nCarney spent the early part of his career as an investment banker with Goldman Sachs.\n\nCarney countered that his private sector experience would help him in government but rejected suggestions that his loyalties were divided.\n\n“I’m on the side of Canadians,” he said.\n\nOn 6 January, the day Trudeau said he would resign, the Liberals trailed the Conservatives by 24 points, according to the public broadcaster CBC’s poll aggregator.\n\nOn Thursday, the CBC data put Liberal support at 43.3% and gave the Conservatives 38% backing.",
+  "published": "2025-04-18 00:00:00",
+  "source": "https://www.theguardian.com",
+  "events": [
+    {
+      "person": "Mark Carney",
+      "cause": "Trump's trade war and annexation threats",
+      "cause_time": null,
+      "decision": "Stand up against Donald Trump",
+      "decision_time": null,
+      "effect": "Focusing attention on Trump as the biggest risk to the economy",
+      "effect_time": null,
+      "context": "During the Canadian election debate",
+      "impact_type": "political",
+      "method": "Speech",
+      "tone": "Defiant"
+    },
+    {
+      "person": "Mark Carney",
+      "cause": "Criticism from Conservative leader Pierre Poilievre",
+      "cause_time": null,
+      "decision": "Respond to accusations of being an extension of Trudeau",
+      "decision_time": null,
+      "effect": "Defending his position and separating himself from Trudeau",
+      "effect_time": null,
+      "context": "During the Canadian election debate",
+      "impact_type": "political",
+      "method": "Speech",
+      "tone": "Defensive"
+    },
+    {
+      "person": "Mark Carney",
+      "cause": "Criticism from other party leaders on stage",
+      "cause_time": null,
+      "decision": "Defend his private sector experience",
+      "decision_time": null,
+      "effect": "Asserting his qualifications for government despite private sector background",
+      "effect_time": null,
+      "context": "During the Canadian election debate",
+      "impact_type": "political",
+      "method": "Speech",
+      "tone": "Assertive"
+    }
+  ]
+}

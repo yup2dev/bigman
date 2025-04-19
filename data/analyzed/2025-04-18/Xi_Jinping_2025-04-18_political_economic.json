@@ -1,0 +1,35 @@
+{
+  "url": "https://www.aljazeera.com/program/inside-story/2025/4/18/did-xi-jinping-succeed-in-winning-support-against-trumps-tariff-war",
+  "title": "Did Xi Jinping succeed in winning support against Trump’s tariff war?",
+  "text": "Chinese president visits three Southeast Asian nations amid global uncertainty.\n\nChinese President Xi Jinping has been on a three-nation tour of Southeast Asia.\n\nXi is seeking to woo the region by projecting China as a source of stability in the face of global uncertainty caused by United States President Donald Trump’s tariffs on 185 countries.\n\nSoutheast Asia is China’s largest trading partner. But many countries, including Vietnam and Cambodia, also have strong business relations with the US.\n\nSome have already reached out to the White House, hoping to negotiate a deal during the 90-day pause on tariffs.\n\nExperts say that by excluding China, Trump’s conciliatory measure is aimed at isolating it globally.\n\nSo, did Xi Jinping succeed in winning over the leaders of Vietnam, Malaysia and Cambodia, to rally against Trump’s crippling trade barriers?\n\nCan Beijing fend off Washington’s attempt to isolate it globally by using the tariff negotiations?\n\nPresenter: Dareen Abughaida\n\nGuests:\n\nShaun Rein – Director, China Market Research Group\n\nDeborah Elms – Head of Trade Policy, Hinrich Foundation\n\nAdvertisement\n\nPaolo von Schirach – President, Global Policy Institute",
+  "published": "2025-04-18 00:00:00",
+  "source": "https://www.aljazeera.com",
+  "events": [
+    {
+      "person": "Xi Jinping",
+      "cause": "Global uncertainty caused by Donald Trump's tariffs on 185 countries",
+      "cause_time": null,
+      "decision": "Seeking to woo Southeast Asia by projecting China as a source of stability",
+      "decision_time": null,
+      "effect": "Winning support against Trump's tariff war",
+      "effect_time": null,
+      "context": "Chinese president visits three Southeast Asian nations amid global uncertainty",
+      "impact_type": "political, economic",
+      "method": "Diplomatic visit",
+      "tone": "Conciliatory"
+    },
+    {
+      "person": "Donald Trump",
+      "cause": "Global uncertainty caused by his tariffs on 185 countries",
+      "cause_time": null,
+      "decision": "Excluding China from conciliatory measures to isolate it globally",
+      "decision_time": null,
+      "effect": "Attempt to isolate China",
+      "effect_time": null,
+      "context": "Trump's tariffs on 185 countries",
+      "impact_type": "political, economic",
+      "method": "Policy decision",
+      "tone": "Aggressive"
+    }
+  ]
+}

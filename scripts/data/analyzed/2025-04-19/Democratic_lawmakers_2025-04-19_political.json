@@ -1,0 +1,16 @@
+{
+  "url": "https://www.nbcnews.com/politics/trump-tariffs",
+  "title": "Trump Tariffs: Latest News, Videos, Trade Effects, Economic Impact, Policies and More",
+  "text": "Several Democratic lawmakers have said they are willing to travel to the Central American country to press for Abrego Garcia's return after the U.S. said he was mistakenly deported.",
+  "published": null,
+  "source": "https://www.nbcnews.com",
+  "events": [
+    {
+      "person": "Democratic lawmakers",
+      "decision": "Willing to travel to the Central American country to press for Abrego Garcia's return",
+      "outcome": "Seeking the return of Abrego Garcia after the U.S. mistakenly deported him",
+      "context": "U.S. mistakenly deported Abrego Garcia",
+      "impact_type": "Political"
+    }
+  ]
+}

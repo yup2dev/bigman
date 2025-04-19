@@ -16,7 +16,7 @@ def load_existing_articles(site_key: str) -> list:
             with open(file_path, 'r', encoding='utf-8') as f:
                 return json.load(f)
         except Exception as e:
-            print(f"⚠️ 기존 기사 로드 실패: {e}")
+            print(f" 기존 기사 로드 실패: {e}")
     return []
 
 
@@ -27,7 +27,7 @@ def process_site(site_key: str, keywords: list, limit: int = 3):  # limit을 10�
         urls = collect_urls(site_key=site_key, keywords=keywords, limit=limit)
 
         if not urls:
-            print(f"⚠️ {site_key}에서 수집된 URL이 없습니다.")
+            print(f" {site_key}에서 수집된 URL이 없습니다.")
             return
 
         # 기존 기사 로드
@@ -39,9 +39,9 @@ def process_site(site_key: str, keywords: list, limit: int = 3):  # limit을 10�
         if articles:
             save_articles(articles, site_key)  # site_key 전달
         else:
-            print(f"⚠️ {site_key}에서 저장할 신규 기사가 없습니다.")
+            print(f" {site_key}에서 저장할 신규 기사가 없습니다.")
     except Exception as e:
-        print(f"❌ {site_key} 처리 중 오류 발생: {e}")
+        print(f" {site_key} 처리 중 오류 발생: {e}")
 
 
 def main():

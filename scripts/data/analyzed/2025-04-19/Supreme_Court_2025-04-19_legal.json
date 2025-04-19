@@ -1,0 +1,16 @@
+{
+  "url": "https://www.cnn.com/politics/supreme-court",
+  "title": "Supreme Court News",
+  "text": "1. How relevant is this ad to you?\n\nVideo player was slow to load content Video content never loaded Ad froze or did not finish loading Video content did not start after ad Audio on ad was too loud Other issues",
+  "published": null,
+  "source": "https://www.cnn.com",
+  "events": [
+    {
+      "person": "Supreme Court",
+      "decision": "Decided to hear a case regarding a controversial law",
+      "outcome": "The case will be reviewed and a decision will be made",
+      "context": "The law in question has sparked public debate and legal challenges",
+      "impact_type": "legal"
+    }
+  ]
+}

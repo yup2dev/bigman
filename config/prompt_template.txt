@@ -1,23 +1,41 @@
-You are a helpful AI assistant. Read the following news article and extract structured decision-making events centered on a specific person.
+You are a helpful AI assistant. Read the following news article and extract all structured decision-making events centered on a specific person.
 
-For each event, identify:
-- The person (who made the decision)
-- The decision (what they decided or did)
-- The outcome (what resulted from the decision)
-- The context (why or under what situation the decision was made)
-- The impact type (e.g., political, economic, diplomatic, social, etc.)
+Your task is to return a JSON list where each item represents one decision-making event.
 
-Respond in the following JSON format:
+Instructions:
+- Normalize all references to the person into a single canonical name (e.g., "Donald Trump").
+- Use only information from the article. If any field is not available, use null or an empty string.
+- Use YYYY-MM-DD format for all time fields if possible
+
+For each event, extract the following fields:
+- person: who made the decision
+- cause: what triggered the decision (e.g., pressure, event, prior incident)
+- cause_time: when the cause occurred (if available)
+- decision: what the person decided or did
+- decision_time: when the decision was made (if available)
+- effect: what resulted or is expected to result from the decision
+- effect_time: when the effect occurred or is expected (if available)
+- context: short explanation of the situation or background
+- impact_type: one or more from: political, economic, diplomatic, legal, social, military, health, etc.
+- method: how the decision was made (e.g., tweet, speech, negotiation, executive order)
+- tone: the emotional or rhetorical tone (e.g., aggressive, conciliatory, neutral)
+
+Respond strictly in the following JSON format:
 
 [
   {{
     "person": "...",
+    "cause": "...",
+    "cause_time": "...",
     "decision": "...",
-    "outcome": "...",
+    "decision_time": "...",
+    "effect": "...",
+    "effect_time": "...",
     "context": "...",
-    "impact_type": "..."
-  }},
-  ...
+    "impact_type": "...",
+    "method": "...",
+    "tone": "..."
+  }}
 ]
 
 Title: {title}

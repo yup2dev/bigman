@@ -1,6 +1,6 @@
 import os
 import logging
-from .utils import save_json
+from .util import save_json
 from .article_parser import parse_articles
 
 def parse_articles_batch(urls, save_dir=None, source_name=None, log_dir="bigman/logs"):

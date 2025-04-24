@@ -6,7 +6,7 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 from datetime import datetime
 from typing import List, Dict
-from .utils import save_json, preprocess_text
+from .util import save_json, preprocess_text
 
 
 def get_embedding(texts: List[str], vectorizer=None) -> torch.Tensor:

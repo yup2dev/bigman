@@ -33,7 +33,6 @@ def calculate_tfidf_importance(articles, keyword_list):
         if score > 0:  # 중요도 점수가 0보다 큰 기사만 추가
             keyword_importance.append((article, score))
 
-    # 중요도 기준으로 내림차순 정렬
     keyword_importance.sort(key=lambda x: x[1], reverse=True)
 
     # 정렬된 기사 리스트 반환

@@ -10,14 +10,13 @@ logging.basicConfig(
     format="%(asctime)s - %(levelname)s - %(message)s",
     handlers=[
         logging.StreamHandler(),  # 콘솔 출력
-        logging.FileHandler("generate_training_data.log", encoding="utf-8")  # 로그 파일 저장
+        logging.FileHandler("../log/generate_training_data.log", encoding="utf-8")  # 로그 파일 저장
     ]
 )
 logger = logging.getLogger(__name__)
 
-
+# 스크랩 데이터 Article 배열로 변환
 def load_articles_from_directory(date_folder: str):
-    """data/processed/날짜 폴더 내 JSON 파일을 읽어 기사 리스트로 반환"""
     all_articles = []
     base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     directory = os.path.join(base_dir, "data", "processed", date_folder)
@@ -88,7 +87,7 @@ def process_articles_by_date(date_input: str = None):
             logger.error(f"기사 분석 중 오류 발생: {e}")
             failure_count += 1
 
-    logger.info(f"\n📊 분석 완료 요약: 성공 {success_count}건 | 실패 {failure_count}건")
+    logger.info(f"분석 완료 요약: 성공 {success_count}건 | 실패 {failure_count}건")
 
 
 if __name__ == "__main__":

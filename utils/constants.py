@@ -31,4 +31,5 @@ DEFAULT_FILE_SUFFIX = ".json"
 DEFAULT_LOG_LEVEL = "INFO"
 
 # ✅ 새로 추가할 경로 상수
-SITES_CONFIG_PATH = os.path.join(BASE_DIR, "config", "sites.yaml")
+SITES_CONFIG_PATH = os.path.join(BASE_DIR, "resource", "sites.yaml")
+PEOPLE_CONFIG_PATH = os.path.join(BASE_DIR, "resource", "people.yaml")

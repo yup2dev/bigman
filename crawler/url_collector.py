@@ -1,10 +1,8 @@
-import os
 import requests
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin
-
-from config.constants import DEFAULT_HEADERS, EXCLUDED_KEYWORDS, SITES_CONFIG_PATH
-from crawler.utils import load_site
+from utils.constants import DEFAULT_HEADERS, EXCLUDED_KEYWORDS, SITES_CONFIG_PATH
+from crawler.util import load_site
 
 def is_valid_article_url(href: str, base_url: str, keywords: list) -> bool:
     if not href or any(k in href for k in EXCLUDED_KEYWORDS):
@@ -22,7 +20,7 @@ def collect_urls(site_key: str, keywords: list, limit: int = 10) -> list:
     collected_links = set()
 
     for seed_url in site_config.get("seed_urls", []):
-        print(f"🔍 Visiting seed: {seed_url}")
+        print(f" Visiting seed: {seed_url}")
         try:
             response = requests.get(seed_url, headers=DEFAULT_HEADERS, timeout=10)
             response.raise_for_status()
@@ -47,5 +45,5 @@ def collect_urls(site_key: str, keywords: list, limit: int = 10) -> list:
             break
 
     result_links = list(collected_links)
-    print(f"✅ 관련 URL 수집 완료: {len(result_links)}건")
+    print(f" 관련 URL 수집 완료: {len(result_links)}건")
     return result_links

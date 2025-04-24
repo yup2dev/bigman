@@ -3,13 +3,13 @@ import json
 from datetime import datetime
 from crawler.url_collector import collect_urls
 from crawler.article_parser import parse_articles, save_articles
-from config.constants import SITES_CONFIG_PATH
-from crawler.utils import load_site
+from utils.constants import SITES_CONFIG_PATH
+from crawler.util import load_site
 
 
 def load_existing_articles(site_key: str) -> list:
     today = datetime.today().strftime('%Y-%m-%d')
-    file_path = os.path.join("data", "processed", today, f"articles_{site_key}_{today}.json")
+    file_path = os.path.join("scripts/data", "processed", today, f"articles_{site_key}_{today}.json")
 
     if os.path.exists(file_path):
         try:
@@ -20,7 +20,7 @@ def load_existing_articles(site_key: str) -> list:
     return []
 
 
-def process_site(site_key: str, keywords: list, limit: int = 3):  # limit을 10으로 증가
+def process_site(site_key: str, keywords: list, limit: int = 3):
     print(f"\n🔍 {site_key} 사이트 기사 수집 시작")
     try:
         # URL 수집

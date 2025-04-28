@@ -1,12 +1,15 @@
 import time
-from typing import List
+from typing import List, Dict
+
+import requests
+from bs4 import BeautifulSoup
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
 from webdriver_manager.chrome import ChromeDriverManager
 
-from utils.constants import DEFAULT_HEADERS, EXCLUDED_KEYWORDS, PEOPLE_CONFIG_PATH
+from utils.constants import EXCLUDED_KEYWORDS, PEOPLE_CONFIG_PATH
 from crawler.util import load_site
 
 
@@ -59,6 +62,88 @@ def get_transcript_urls(site_key: str, limit: int = 10) -> List[str]:
 
     finally:
         driver.quit()
+
+
+def extract_full_text_rollcall_with_speaker(url: str) -> str:
+    """Rollcall 스타일 인터뷰에서 발언자 + 발언 내용을 정리해서 가져온다."""
+    try:
+        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36"}
+        resp = requests.get(url, headers=headers, timeout=10)
+
+        if resp.status_code != 200:
+            print(f"❌ Failed to fetch URL ({resp.status_code}): {url}")
+            return ""
+
+        if not resp.content.strip():
+            print(f"❌ Empty response received from: {url}")
+            return ""
+
+        soup = BeautifulSoup(resp.content, "html.parser")
+
+        content_blocks = soup.select('h2.text-md.inline, div.flex-auto.text-md.text-gray-600.leading-loose')
+
+        current_speaker = None
+        dialogue = []
+
+        for block in content_blocks:
+            if block.name == "h2":
+                current_speaker = block.get_text(strip=True)
+            elif block.name == "div":
+                if current_speaker:
+                    speech = block.get_text(strip=True)
+                    if speech:  # 빈 발언 제거
+                        dialogue.append(f"{current_speaker}: {speech}")
+
+        full_text = "\n\n".join(dialogue)
+        return full_text
+
+    except requests.RequestException as e:
+        print(f"❌ HTTP error while extracting: {url}, error: {e}")
+        return ""
+    except Exception as e:
+        print(f"❌ Failed to extract full text (parse error): {url}, error: {e}")
+        return ""
+
+def extract_rollcall_interview(urls: List[str], existing_articles: List[Dict]) -> List[Dict]:
+    """주어진 Rollcall 인터뷰 URL 리스트를 파싱하고 중복을 제거하여 신규 기사 리스트 반환"""
+    seen_urls = set(a["url"] for a in existing_articles)
+    existing_texts = [a["text"] for a in existing_articles if a.get("text")]
+
+    new_articles = []
+
+    for url in urls:
+        if not isinstance(url, str) or not url.startswith("http"):
+            print(f"⚠️ Skipping invalid URL: {url}")
+            continue
+        if url in seen_urls:
+            print(f"⚠️ Duplicate URL skipped: {url}")
+            continue
+
+        full_text = extract_full_text_rollcall_with_speaker(url)
+
+        if not full_text.strip():
+            print(f"⚠️ Skipping empty article: {url}")
+            continue
+
+        # 중복 텍스트 검사 (앞부분 500자 또는 전체 20% 기준 비교)
+        is_duplicate = any(full_text[:500] in text or full_text[:int(len(full_text)*0.2)] in text for text in existing_texts)
+        if is_duplicate:
+            print(f"⚠️ Skipping duplicate article based on text: {url}")
+            continue
+
+        new_article = {
+            "url": url,
+            "title": url.split("/")[-1].replace('-', ' ').capitalize(),
+            "text": full_text.strip(),
+            "published": None,  # 시간 정보 수집할 경우 별도 구현
+            "source": url.split("/")[2]
+        }
+
+        new_articles.append(new_article)
+        seen_urls.add(url)
+        existing_texts.append(full_text)
+
+    return new_articles
 
 
 if __name__ == "__main__":

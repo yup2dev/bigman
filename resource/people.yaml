@@ -1,6 +1,4 @@
 rollcall:
-  base_url: "https://rollcall.com/factbase/trump/search/"
-  api_url:  "/wp-json/factbase/v1/search"
+  base_url: "https://rollcall.com/"
   seed_urls:
-    - "https://rollcall.com/factbase/donald-trump"
-  min_url_length: 40
+    - "https://rollcall.com/factbase/trump/search/"

@@ -92,8 +92,8 @@ def save_articles(articles: List[Dict], site_key: str):  # site_key 추가
         return
 
     today = datetime.today().strftime('%Y-%m-%d')
-    current_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    folder_path = os.path.join(current_dir, "data", "processed", today)
+    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    folder_path = os.path.join(base_dir, "data", "processed", today)
 
     os.makedirs(folder_path, exist_ok=True)
     print(f"📁 저장 폴더: {folder_path}")
@@ -108,9 +108,21 @@ def save_articles(articles: List[Dict], site_key: str):  # site_key 추가
             existing_articles = json.load(f)
         articles = existing_articles + articles
 
-    save_json(articles, file_path)
+    # 👉 ① 타입별 그룹
+    buckets: Dict[str, List[Dict]] = {}
+    for art in articles:
+        buckets.setdefault(art.get("doc_type", "unknown"), []).append(art)
 
-    if os.path.exists(file_path):
-        print(f"✅ 기사 저장 완료: {file_path} ({len(articles)}개)")
-    else:
-        print(f"❌ 파일 저장 실패: {file_path}")
+    # 👉 ② 타입마다 별도 파일
+    for dtype, items in buckets.items():
+        # ⬇️ 올바른 경로 + f-string + os.path.exists 사용
+        fpath = os.path.join(folder_path, f"{site_key}_{dtype}_{today}.json")
+
+        if os.path.exists(fpath):
+            with open(fpath, "r", encoding="utf-8") as fp:
+                items = json.load(fp) + items
+
+        with open(fpath, "w", encoding="utf-8") as fp:
+            json.dump(items, fp, ensure_ascii=False, indent=2)
+
+        print(f"✅ {dtype:<10} → {fpath} ({len(items)}개)")

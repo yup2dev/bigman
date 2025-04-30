@@ -1,6 +1,6 @@
 import time
 from typing import List, Dict
-
+import re
 import requests
 from bs4 import BeautifulSoup
 from selenium import webdriver
@@ -9,28 +9,28 @@ from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
 from webdriver_manager.chrome import ChromeDriverManager
 
-from utils.constants import EXCLUDED_KEYWORDS, PEOPLE_CONFIG_PATH
+from utils.constants import EXCLUDED_KEYWORDS, PEOPLE_CONFIG_PATH, DEFAULT_HEADERS
 from crawler.util import load_site
 
 
 def get_transcript_urls(site_key: str, limit: int = 10) -> List[str]:
     # 1) site_config 로드
-    configs     = load_site(PEOPLE_CONFIG_PATH)
+    configs = load_site(PEOPLE_CONFIG_PATH)
     site_config = configs.get(site_key)
     if not site_config:
         raise ValueError(f"Site config for '{site_key}' not found.")
 
-    base_url    = site_config["base_url"].rstrip("/")
+    base_url = site_config["base_url"].rstrip("/")
     search_path = site_config.get("search_path",
                                  site_config.get("search_url", "/factbase/trump/search/"))
-    wait_time   = site_config.get("wait_time", 3)
-    anchor_sel  = site_config.get("anchor_selector",
+    wait_time = site_config.get("wait_time", 3)
+    anchor_sel = site_config.get("anchor_selector",
                                  "a[href*='/factbase/trump/transcript/']")
     button_text = site_config.get("button_text", "View Transcript")
 
     # 2) Selenium headless 브라우저 설정
     opts = Options()
-    opts.headless       = True
+    opts.headless = True
     opts.add_argument("--disable-gpu")
     opts.add_argument("--no-sandbox")
     service = Service(ChromeDriverManager().install())
@@ -41,7 +41,7 @@ def get_transcript_urls(site_key: str, limit: int = 10) -> List[str]:
         time.sleep(wait_time)  # JS 렌더링 대기
 
         elems = driver.find_elements(By.CSS_SELECTOR, anchor_sel)
-        urls  = []
+        urls = []
         for a in elems:
             href = a.get_attribute("href") or ""
             text = a.text.strip()
@@ -67,8 +67,7 @@ def get_transcript_urls(site_key: str, limit: int = 10) -> List[str]:
 def extract_full_text_rollcall_with_speaker(url: str) -> str:
     """Rollcall 스타일 인터뷰에서 발언자 + 발언 내용을 정리해서 가져온다."""
     try:
-        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36"}
-        resp = requests.get(url, headers=headers, timeout=10)
+        resp = requests.get(url, headers=DEFAULT_HEADERS, timeout=10)
 
         if resp.status_code != 200:
             print(f"❌ Failed to fetch URL ({resp.status_code}): {url}")
@@ -98,11 +97,23 @@ def extract_full_text_rollcall_with_speaker(url: str) -> str:
         return full_text
 
     except requests.RequestException as e:
-        print(f"❌ HTTP error while extracting: {url}, error: {e}")
+        print(f"HTTP error while extracting: {url}, error: {e}")
         return ""
     except Exception as e:
-        print(f"❌ Failed to extract full text (parse error): {url}, error: {e}")
+        print(f"Failed to extract full text (parse error): {url}, error: {e}")
         return ""
+
+def guess_type(t: str) -> str:
+    t = t.strip()
+    if re.search(r'^(q:|question:)', t, re.I|re.M):
+        return "interview"
+    if re.search(r'^[A-Z][a-z]+\\s[A-Z][a-z]+:', t):    # 화자: 텍스트
+        lines = t.splitlines()
+        speaker_lines = sum(':' in l and l.split(':',1)[0].istitle() for l in lines[:20])
+        if speaker_lines > 3:
+            return "speech"
+    return "article"
+
 
 def extract_rollcall_interview(urls: List[str], existing_articles: List[Dict]) -> List[Dict]:
     """주어진 Rollcall 인터뷰 URL 리스트를 파싱하고 중복을 제거하여 신규 기사 리스트 반환"""
@@ -113,30 +124,31 @@ def extract_rollcall_interview(urls: List[str], existing_articles: List[Dict]) -
 
     for url in urls:
         if not isinstance(url, str) or not url.startswith("http"):
-            print(f"⚠️ Skipping invalid URL: {url}")
+            print(f"Skipping invalid URL: {url}")
             continue
         if url in seen_urls:
-            print(f"⚠️ Duplicate URL skipped: {url}")
+            print(f"Duplicate URL skipped: {url}")
             continue
 
         full_text = extract_full_text_rollcall_with_speaker(url)
 
         if not full_text.strip():
-            print(f"⚠️ Skipping empty article: {url}")
+            print(f"Skipping empty article: {url}")
             continue
 
         # 중복 텍스트 검사 (앞부분 500자 또는 전체 20% 기준 비교)
         is_duplicate = any(full_text[:500] in text or full_text[:int(len(full_text)*0.2)] in text for text in existing_texts)
         if is_duplicate:
-            print(f"⚠️ Skipping duplicate article based on text: {url}")
+            print(f"Skipping duplicate article based on text: {url}")
             continue
 
         new_article = {
             "url": url,
             "title": url.split("/")[-1].replace('-', ' ').capitalize(),
             "text": full_text.strip(),
-            "published": None,  # 시간 정보 수집할 경우 별도 구현
-            "source": url.split("/")[2]
+            "published": None,
+            "source": url.split("/")[2],
+            "doc_type": guess_type(full_text)
         }
 
         new_articles.append(new_article)
@@ -149,9 +161,9 @@ def extract_rollcall_interview(urls: List[str], existing_articles: List[Dict]) -
 if __name__ == "__main__":
     import sys
 
-    key   = sys.argv[1] if len(sys.argv) > 1 else "rollcall"
+    key = sys.argv[1] if len(sys.argv) > 1 else "rollcall"
     limit = int(sys.argv[2]) if len(sys.argv) > 2 else 10
 
-    print(f"\n▶️ '{key}' URL {limit}건 수집 시작")
+    print(f"\n '{key}' URL {limit}건 수집 시작")
     for idx, u in enumerate(get_transcript_urls(key, limit), start=1):
         print(f"{idx:2d}. {u}")

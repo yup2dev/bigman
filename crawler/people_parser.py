@@ -1,6 +1,5 @@
-import time
+import time, re
 from typing import List, Dict
-import re
 import requests
 from bs4 import BeautifulSoup
 from selenium import webdriver
@@ -22,7 +21,7 @@ def get_transcript_urls(site_key: str, limit: int = 10) -> List[str]:
 
     base_url = site_config["base_url"].rstrip("/")
     search_path = site_config.get("search_path",
-                                 site_config.get("search_url", "/factbase/trump/search/"))
+                                  site_config.get("search_url", "/factbase/trump/search/"))
     wait_time = site_config.get("wait_time", 3)
     anchor_sel = site_config.get("anchor_selector",
                                  "a[href*='/factbase/trump/transcript/']")
@@ -34,7 +33,7 @@ def get_transcript_urls(site_key: str, limit: int = 10) -> List[str]:
     opts.add_argument("--disable-gpu")
     opts.add_argument("--no-sandbox")
     service = Service(ChromeDriverManager().install())
-    driver  = webdriver.Chrome(service=service, options=opts)
+    driver = webdriver.Chrome(service=service, options=opts)
 
     try:
         driver.get(base_url + search_path)
@@ -64,8 +63,37 @@ def get_transcript_urls(site_key: str, limit: int = 10) -> List[str]:
         driver.quit()
 
 
-def extract_full_text_rollcall_with_speaker(url: str) -> str:
-    """Rollcall 스타일 인터뷰에서 발언자 + 발언 내용을 정리해서 가져온다."""
+def get_rollcall_title(url: str) -> str:
+    try:
+        resp = requests.get(url, headers=DEFAULT_HEADERS, timeout=10)
+
+        if resp.status_code != 200:
+            print(f"❌ Failed to fetch URL ({resp.status_code}): {url}")
+            return ""
+
+        if not resp.content.strip():
+            print(f"❌ Failed to fetch URL ({resp.status_code}): {url}")
+            return ""
+
+        soup = BeautifulSoup(resp.content, "html.parser")
+        content_blocks = soup.select('h1.not-italic.font-semibold.leading-normal')
+        title = None
+
+        for block in content_blocks:
+            if block.name == "h1":
+                title = block.get_text(strip=True)
+
+        return title
+
+    except requests.RequestException as e:
+        print(f"HTTP error while extracting: {url}, error: {e}")
+        return ""
+    except Exception as e:
+        print(f"Failed to extract full text (parse error): {url}, error: {e}")
+        return ""
+
+
+def get_rollcall_text(url: str) -> str:
     try:
         resp = requests.get(url, headers=DEFAULT_HEADERS, timeout=10)
 
@@ -90,7 +118,7 @@ def extract_full_text_rollcall_with_speaker(url: str) -> str:
             elif block.name == "div":
                 if current_speaker:
                     speech = block.get_text(strip=True)
-                    if speech:  # 빈 발언 제거
+                    if speech:
                         dialogue.append(f"{current_speaker}: {speech}")
 
         full_text = "\n\n".join(dialogue)
@@ -103,20 +131,12 @@ def extract_full_text_rollcall_with_speaker(url: str) -> str:
         print(f"Failed to extract full text (parse error): {url}, error: {e}")
         return ""
 
-def guess_type(t: str) -> str:
-    t = t.strip()
-    if re.search(r'^(q:|question:)', t, re.I|re.M):
-        return "interview"
-    if re.search(r'^[A-Z][a-z]+\\s[A-Z][a-z]+:', t):    # 화자: 텍스트
-        lines = t.splitlines()
-        speaker_lines = sum(':' in l and l.split(':',1)[0].istitle() for l in lines[:20])
-        if speaker_lines > 3:
-            return "speech"
-    return "article"
+
+def get_type(t: str) -> str:
+    return t.strip().split(":")[0]
 
 
 def extract_rollcall_interview(urls: List[str], existing_articles: List[Dict]) -> List[Dict]:
-    """주어진 Rollcall 인터뷰 URL 리스트를 파싱하고 중복을 제거하여 신규 기사 리스트 반환"""
     seen_urls = set(a["url"] for a in existing_articles)
     existing_texts = [a["text"] for a in existing_articles if a.get("text")]
 
@@ -130,25 +150,25 @@ def extract_rollcall_interview(urls: List[str], existing_articles: List[Dict]) -
             print(f"Duplicate URL skipped: {url}")
             continue
 
-        full_text = extract_full_text_rollcall_with_speaker(url)
+        full_text = get_rollcall_text(url)
 
         if not full_text.strip():
             print(f"Skipping empty article: {url}")
             continue
 
-        # 중복 텍스트 검사 (앞부분 500자 또는 전체 20% 기준 비교)
-        is_duplicate = any(full_text[:500] in text or full_text[:int(len(full_text)*0.2)] in text for text in existing_texts)
+        is_duplicate = any(
+            full_text[:200] in text or full_text[:int(len(full_text) * 0.2)] in text for text in existing_texts)
         if is_duplicate:
             print(f"Skipping duplicate article based on text: {url}")
             continue
 
         new_article = {
             "url": url,
-            "title": url.split("/")[-1].replace('-', ' ').capitalize(),
+            "title": get_rollcall_title(url),
             "text": full_text.strip(),
             "published": None,
             "source": url.split("/")[2],
-            "doc_type": guess_type(full_text)
+            "doc_type": get_type(get_rollcall_title(url))
         }
 
         new_articles.append(new_article)

@@ -31,7 +31,7 @@ def is_duplicate_article(current_text: str, existing_texts: List[str], similarit
     max_similarity = similarities.max()
 
     if max_similarity >= similarity_threshold:
-        print(f"⚠️ 중복 기사 감지됨 (유사도: {max_similarity:.4f})")
+        print(f"중복 기사 (유사도: {max_similarity:.4f})")
         return True
     return False
 
@@ -43,10 +43,10 @@ def parse_articles(urls: List[str], existing_articles: List[Dict]) -> List[Dict]
 
     for url in urls:
         if not isinstance(url, str) or not url.startswith("http"):
-            print(f"⚠️ Skipping invalid URL: {url}")
+            print(f" Skipping invalid URL: {url}")
             continue
         if url in seen_urls:
-            print(f"⚠️ Duplicate URL skipped: {url}")
+            print(f" Duplicate URL skipped: {url}")
             continue
 
         try:
@@ -55,14 +55,14 @@ def parse_articles(urls: List[str], existing_articles: List[Dict]) -> List[Dict]
             article.parse()
 
             if not article.text.strip():
-                print(f"⚠️ Skipping empty article: {url}")
+                print(f" Skipping empty article: {url}")
                 continue
 
             current_text = preprocess_text(article.text)
             existing_texts = [preprocess_text(a["text"]) for a in all_articles if a.get("text")]
 
             if is_duplicate_article(current_text, existing_texts):
-                print(f"⚠️ Skipping duplicate article: {article.title}")
+                print(f" Skipping duplicate article: {article.title}")
                 continue
 
             new_article = {
@@ -115,7 +115,6 @@ def save_articles(articles: List[Dict], site_key: str):  # site_key 추가
 
     # 👉 ② 타입마다 별도 파일
     for dtype, items in buckets.items():
-        # ⬇️ 올바른 경로 + f-string + os.path.exists 사용
         fpath = os.path.join(folder_path, f"{site_key}_{dtype}_{today}.json")
 
         if os.path.exists(fpath):

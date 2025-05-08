@@ -2,7 +2,7 @@ import os
 import json
 from datetime import datetime
 from crawler.people_parser import get_transcript_urls, extract_rollcall_interview
-from crawler.article_parser import parse_articles, save_articles
+from crawler.article_parser import save_articles
 from utils.constants import PEOPLE_CONFIG_PATH
 from crawler.util import load_site
 

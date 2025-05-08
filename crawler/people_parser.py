@@ -6,6 +6,7 @@ from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
+from selenium.webdriver.support.select import Select
 from webdriver_manager.chrome import ChromeDriverManager
 
 from utils.constants import EXCLUDED_KEYWORDS, PEOPLE_CONFIG_PATH, DEFAULT_HEADERS
@@ -37,6 +38,14 @@ def get_transcript_urls(site_key: str, limit: int = 10) -> List[str]:
 
     try:
         driver.get(base_url + search_path)
+        time.sleep(wait_time)  # JS 렌더링 대기
+
+        driver.find_element(By.XPATH, '// *[ @ id = "main"] / div[2] / div / div / form / div[3] / div[2] / div[1] / div[2] / select').click()
+        dropdown = Select(driver.find_element(By.XPATH, '// *[ @ id = "main"] / div[2] / div / div / form / div[3] / div[2] / div[1] / div[2] / select'))
+        time.sleep(wait_time)  # JS 렌더링 대기
+        dropdown.select_by_value('desc')
+        time.sleep(wait_time)  # JS 렌더링 대기
+        dropdown.select_by_value('asc')
         time.sleep(wait_time)  # JS 렌더링 대기
 
         elems = driver.find_elements(By.CSS_SELECTOR, anchor_sel)

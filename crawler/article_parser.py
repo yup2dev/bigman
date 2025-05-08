@@ -3,7 +3,6 @@ import json
 import torch
 from newspaper import Article
 from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.metrics.pairwise import cosine_similarity
 from datetime import datetime
 from typing import List, Dict
 from utils.util import preprocess_text, similarity_check

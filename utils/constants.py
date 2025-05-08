@@ -6,7 +6,7 @@ DEFAULT_HEADERS = {
 }
 
 # 제외 키워드 (기사 URL 또는 제목 기준 필터링용)
-EXCLUDED_KEYWORDS = {"video", "sports", "opinion", "audio", "sport"}
+EXCLUDED_KEYWORDS = {"sports", "audio", "sport"}
 
 # 주요 키워드 (특정 인물 중심)
 TARGET_KEYWORDS = {"Trump", "Donald Trump", "트럼프"}

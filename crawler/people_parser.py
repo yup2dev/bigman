@@ -46,7 +46,17 @@ def get_transcript_urls(site_key: str, limit: int = 10) -> List[str]:
         dropdown.select_by_value('desc')
         time.sleep(wait_time)  # JS 렌더링 대기
         dropdown.select_by_value('asc')
-        time.sleep(wait_time)  # JS 렌더링 대기
+        time.sleep(wait_time)
+
+        # 스크롤 처리
+        last_height = driver.execute_script("return document.body.scrollHeight")
+        for _ in range(2):
+            driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+            time.sleep(wait_time)
+            new_height = driver.execute_script("return document.body.scrollHeight")
+            if new_height == last_height:
+                break
+            last_height = new_height
 
         elems = driver.find_elements(By.CSS_SELECTOR, anchor_sel)
         urls = []
@@ -65,7 +75,7 @@ def get_transcript_urls(site_key: str, limit: int = 10) -> List[str]:
                 urls.append(href)
             if len(urls) >= limit:
                 break
-
+        print(f"총 URL 수: {len(urls)}")
         return urls
 
     finally:

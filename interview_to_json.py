@@ -20,7 +20,7 @@ def load_existing_articles(site_key: str) -> list:
     return []
 
 
-def process_site(site_key: str, limit: int = 3):
+def process_site(site_key: str, limit: int = 30):
     print(f"\n🔍 {site_key} 사이트 기사 수집 시작")
     try:
         # URL 수집
@@ -48,7 +48,7 @@ def main():
     sites_config = load_site(PEOPLE_CONFIG_PATH)
 
     for site_key in sites_config:
-        process_site(site_key, limit=1)
+        process_site(site_key, limit=30)
 
 
 if __name__ == "__main__":

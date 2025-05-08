@@ -4,7 +4,7 @@ from datetime import datetime
 from crawler.url_collector import collect_urls
 from crawler.article_parser import parse_articles, save_articles
 from utils.constants import SITES_CONFIG_PATH
-from crawler.util import load_site
+from utils.util import load_site
 
 
 def load_existing_articles(site_key: str) -> list:

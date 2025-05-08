@@ -2,7 +2,7 @@ import logging
 from datetime import datetime
 import os
 from nlp_processor import NLPProcessor
-from crawler.util import save_json, load_json
+from utils.util import save_json, load_json
 
 # Configure logging
 logging.basicConfig(

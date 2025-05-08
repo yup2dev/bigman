@@ -5,11 +5,13 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+
 def ensure_dir(directory):
     """Ensure directory exists, create if it doesn't"""
     if not os.path.exists(directory):
         os.makedirs(directory)
         logger.info(f"Created directory: {directory}")
+
 
 def save_analysis_results(results, source, date=None):
     """
@@ -39,6 +41,7 @@ def save_analysis_results(results, source, date=None):
     except Exception as e:
         logger.error(f"Failed to save analysis results: {e}")
         return False
+
 
 def load_articles(date=None):
     """
@@ -72,4 +75,4 @@ def load_articles(date=None):
             except Exception as e:
                 logger.error(f"Failed to load articles from {source}: {e}")
     
-    return articles 
+    return articles

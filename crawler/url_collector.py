@@ -2,7 +2,7 @@ import requests
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin
 from utils.constants import DEFAULT_HEADERS, EXCLUDED_KEYWORDS, SITES_CONFIG_PATH
-from crawler.util import load_site
+from utils.util import load_site
 
 def is_valid_article_url(href: str, base_url: str, keywords: list) -> bool:
     if not href or any(k in href for k in EXCLUDED_KEYWORDS):

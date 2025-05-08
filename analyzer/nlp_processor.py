@@ -128,7 +128,7 @@ class NLPProcessor:
 
             data = json.loads(cleaned_result)
             if not isinstance(data, list):
-                logger.warning("응답이 리스트 형식이 아님")
+                logger.warning("Not List type")
                 return None
 
             required_fields = ['person', 'decision', 'effect', 'context', 'impact_type']

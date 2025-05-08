@@ -1,4 +1,4 @@
-import time, re
+import time
 from typing import List, Dict
 import requests
 from bs4 import BeautifulSoup
@@ -9,7 +9,7 @@ from selenium.webdriver.common.by import By
 from webdriver_manager.chrome import ChromeDriverManager
 
 from utils.constants import EXCLUDED_KEYWORDS, PEOPLE_CONFIG_PATH, DEFAULT_HEADERS
-from crawler.util import load_site
+from utils.util import load_site, similarity_check
 
 
 def get_transcript_urls(site_key: str, limit: int = 10) -> List[str]:
@@ -150,25 +150,34 @@ def extract_rollcall_interview(urls: List[str], existing_articles: List[Dict]) -
             print(f"Duplicate URL skipped: {url}")
             continue
 
-        full_text = get_rollcall_text(url)
+        full_text = get_rollcall_text(url).strip()
+        doc_type = get_type(get_rollcall_title(url))
+        text = []
 
-        if not full_text.strip():
-            print(f"Skipping empty article: {url}")
-            continue
+        # enumerate 사용 시 2개만 반환 (index, "text")
+        for i, block in enumerate(full_text.split("\n\n")):
+            block = block.strip()
+            if not block:
+                continue
+            text.append({
+                "id": i+1,
+                "text": block,
+                "sentiment": None,
+                "importance": None
+            })
 
-        is_duplicate = any(
-            full_text[:200] in text or full_text[:int(len(full_text) * 0.2)] in text for text in existing_texts)
-        if is_duplicate:
-            print(f"Skipping duplicate article based on text: {url}")
-            continue
+        # 변수 2개임
+        # similarity_check(
+        #     any(
+        #         full_text[:200] in text for text in existing_texts)
+        # )
 
         new_article = {
             "url": url,
             "title": get_rollcall_title(url),
-            "text": full_text.strip(),
-            "published": None,
+            "text": text,
             "source": url.split("/")[2],
-            "doc_type": get_type(get_rollcall_title(url))
+            "doc_type": doc_type
         }
 
         new_articles.append(new_article)
@@ -176,14 +185,3 @@ def extract_rollcall_interview(urls: List[str], existing_articles: List[Dict]) -
         existing_texts.append(full_text)
 
     return new_articles
-
-
-if __name__ == "__main__":
-    import sys
-
-    key = sys.argv[1] if len(sys.argv) > 1 else "rollcall"
-    limit = int(sys.argv[2]) if len(sys.argv) > 2 else 10
-
-    print(f"\n '{key}' URL {limit}건 수집 시작")
-    for idx, u in enumerate(get_transcript_urls(key, limit), start=1):
-        print(f"{idx:2d}. {u}")

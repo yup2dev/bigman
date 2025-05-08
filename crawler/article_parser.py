@@ -6,7 +6,7 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 from datetime import datetime
 from typing import List, Dict
-from .util import save_json, preprocess_text
+from utils.util import preprocess_text, similarity_check
 
 
 def get_embedding(texts: List[str], vectorizer=None) -> torch.Tensor:
@@ -14,26 +14,6 @@ def get_embedding(texts: List[str], vectorizer=None) -> torch.Tensor:
         vectorizer = TfidfVectorizer()
     tfidf_matrix = vectorizer.fit_transform(texts)
     return torch.tensor(tfidf_matrix.toarray(), dtype=torch.float32)
-
-
-def is_duplicate_article(current_text: str, existing_texts: List[str], similarity_threshold: float = 0.95) -> bool:
-    if not existing_texts:
-        return False
-
-    texts = existing_texts + [current_text]
-    vectorizer = TfidfVectorizer()
-    embeddings = vectorizer.fit_transform(texts).toarray()
-
-    current_vector = embeddings[-1].reshape(1, -1)
-    existing_vectors = embeddings[:-1]
-
-    similarities = cosine_similarity(current_vector, existing_vectors)
-    max_similarity = similarities.max()
-
-    if max_similarity >= similarity_threshold:
-        print(f"중복 기사 (유사도: {max_similarity:.4f})")
-        return True
-    return False
 
 
 def parse_articles(urls: List[str], existing_articles: List[Dict]) -> List[Dict]:
@@ -61,7 +41,7 @@ def parse_articles(urls: List[str], existing_articles: List[Dict]) -> List[Dict]
             current_text = preprocess_text(article.text)
             existing_texts = [preprocess_text(a["text"]) for a in all_articles if a.get("text")]
 
-            if is_duplicate_article(current_text, existing_texts):
+            if similarity_check(current_text, existing_texts):
                 print(f" Skipping duplicate article: {article.title}")
                 continue
 

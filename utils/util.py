@@ -1,18 +1,19 @@
-import yaml
-import re
 import json
-import os
+import time, re, os, yaml
 from datetime import datetime
 from newspaper import Article
 from typing import List, Dict
-import time
+from sklearn.feature_extraction.text import TfidfVectorizer
+from torch import cosine_similarity
 
 def load_site(config_path: str) -> dict:
     with open(config_path, "r", encoding="utf-8") as f:
         return yaml.safe_load(f)
 
+
 def preprocess_text(text: str) -> str:
     return text.strip().lower()
+
 
 def filter_urls_by_keyword(urls, keywords):
     pattern = re.compile('|'.join(keywords), re.IGNORECASE)
@@ -36,6 +37,7 @@ def save_json(data, filepath: str, ensure_dir=True, indent=2):
         json.dump(data, f, ensure_ascii=False, indent=indent, default=datetime_converter)
 
     print(f"[+] JSON saved to {filepath}")
+
 
 def load_json(filepath: str, encoding: str = "utf-8") -> dict:
     """
@@ -70,3 +72,23 @@ def load_articles_from_urls(urls: List[str], delay: float = 3.0) -> List[Dict]:
         except Exception as e:
             print(f"Failed to Collecting Articles...: {url} - {e}")
     return articles
+
+
+def similarity_check(current_text: str, existing_texts: List[str], similarity_threshold: float = 0.90) -> bool:
+    if not existing_texts:
+        return False
+
+    texts = existing_texts + [current_text]
+    vectorizer = TfidfVectorizer()
+    embeddings = vectorizer.fit_transform(texts).toarray()
+
+    current_vector = embeddings[-1].reshape(1, -1)
+    existing_vectors = embeddings[:-1]
+
+    similarities = cosine_similarity(current_vector, existing_vectors)
+    max_similarity = similarities.max()
+
+    if max_similarity >= similarity_threshold:
+        print(f"중복 감지 (유사도: {max_similarity:.4f})")
+        return True
+    return False

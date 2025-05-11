@@ -104,3 +104,58 @@ def save_articles(articles: List[Dict], site_key: str):  # site_key 추가
             json.dump(items, fp, ensure_ascii=False, indent=2)
 
         print(f"✅ {dtype:<10} → {fpath} ({len(items)}개)")
+
+def save_articles_with_date(articles: List[Dict], site_key: str, date_str: str):
+    if not articles:
+        print("📝 No articles to save.")
+        return
+
+    try:
+        year = datetime.strptime(date_str, '%Y-%m-%d').year
+    except ValueError:
+        print(f"⚠️ Invalid date format: {date_str}. Expected 'YYYY-MM-DD'.")
+        return
+
+    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    folder_path = os.path.join(base_dir, "data", "processed", str(year))
+
+    # Create year folder
+    os.makedirs(folder_path, exist_ok=True)
+    print(f"📁 Folder created or exists: {folder_path}")
+
+    # Site-specific filename
+    filename = f"articles_{site_key}_{date_str}.json"
+    file_path = os.path.join(folder_path, filename)
+
+    # Load existing articles and append new ones
+    if os.path.exists(file_path):
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                existing_articles = json.load(f)
+            articles = existing_articles + articles
+        except Exception as e:
+            print(f"⚠️ Failed to load existing articles: {e}")
+
+    # Group articles by doc_type
+    buckets: Dict[str, List[Dict]] = {}
+    for art in articles:
+        buckets.setdefault(art.get("doc_type", "unknown"), []).append(art)
+
+    # Save each doc_type to separate files
+    for dtype, items in buckets.items():
+        fpath = os.path.join(folder_path, f"{site_key}_{dtype}_{date_str}.json")
+
+        if os.path.exists(fpath):
+            try:
+                with open(fpath, "r", encoding="utf-8") as fp:
+                    existing_items = json.load(fp)
+                items = existing_items + items
+            except Exception as e:
+                print(f"⚠️ Failed to load existing type-specific articles: {e}")
+
+        try:
+            with open(fpath, "w", encoding="utf-8") as fp:
+                json.dump(items, fp, ensure_ascii=False, indent=2)
+            print(f"✅ {dtype:<10} → {fpath} ({len(items)} items)")
+        except Exception as e:
+            print(f"⚠️ Failed to save file: {e}")

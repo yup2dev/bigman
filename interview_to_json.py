@@ -1,8 +1,9 @@
 import os
 import json
+from collections import defaultdict
 from datetime import datetime
-from crawler.people_parser import get_transcript_urls, extract_rollcall_interview
-from crawler.article_parser import save_articles
+from crawler.people_parser import RollCallCrawler
+from crawler.article_parser import save_articles_with_date
 from utils.constants import PEOPLE_CONFIG_PATH
 from utils.util import load_site
 
@@ -20,35 +21,50 @@ def load_existing_articles(site_key: str) -> list:
     return []
 
 
-def process_site(site_key: str, limit: int = 30):
-    print(f"\n🔍 {site_key} 사이트 기사 수집 시작")
+def process_site(site_key: str, limit: int = 5) -> None:
+    print(f"🔍 Starting article collection for {site_key}")
+    crawler = None
     try:
-        # URL 수집
-        urls = get_transcript_urls(site_key=site_key, limit=limit)
+        crawler = RollCallCrawler(site_key=site_key, limit=limit)
+        urls = crawler.get_urls()
 
         if not urls:
-            print(f" {site_key}에서 수집된 URL이 없습니다.")
+            print(f"⚠️ No URLs collected from {site_key}")
             return
 
-        # 기존 기사 로드
         existing_articles = load_existing_articles(site_key)
 
-        # 기사 파싱 및 중복 제거
-        articles = extract_rollcall_interview(urls, existing_articles)
+        # 날짜별로 기사를 그룹화
+        date_groups = defaultdict(list)
+        for url in urls:
+            date_str = crawler.get_date(url)
+            if date_str:
+                date_groups[date_str].append(url)
+            else:
+                print(f"⚠️ Could not extract date from title for URL: {url}")
 
-        if articles:
-            save_articles(articles, site_key)  # site_key 전달
-        else:
-            print(f" {site_key}에서 저장할 신규 기사가 없습니다.")
+        # 각 날짜별로 처리
+        for date_str, date_urls in date_groups.items():
+            articles = crawler.extract_interviews(date_urls, existing_articles)
+            if articles:
+                save_articles_with_date(articles, site_key, date_str)
+                print(f"✅ Saved {len(articles)} new articles for {site_key} on {date_str}")
+            else:
+                print(f"ℹ️ No new articles for {site_key} on {date_str}")
+
     except Exception as e:
-        print(f" {site_key} 처리 중 오류 발생: {e}")
-
+        print(f"❌ Error processing {site_key}: {e}")
+        raise
+    finally:
+        if crawler:
+            crawler.close()
+            print(f"🛑 Closed crawler for {site_key}")
 
 def main():
     sites_config = load_site(PEOPLE_CONFIG_PATH)
 
     for site_key in sites_config:
-        process_site(site_key, limit=30)
+        process_site(site_key, limit=10)
 
 
 if __name__ == "__main__":

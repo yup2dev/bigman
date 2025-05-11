@@ -1,9 +1,6 @@
 import logging
 import os
 import tempfile
-
-from http.cookiejar import CookieJar as cj
-
 from .version import __version__
 
 log = logging.getLogger(__name__)

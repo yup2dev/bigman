@@ -1,5 +1,7 @@
+import re
+from datetime import datetime
+from typing import List, Dict, Optional
 import time
-from typing import List, Dict
 import requests
 from bs4 import BeautifulSoup
 from selenium import webdriver
@@ -10,197 +12,204 @@ from selenium.webdriver.support.select import Select
 from webdriver_manager.chrome import ChromeDriverManager
 
 from utils.constants import EXCLUDED_KEYWORDS, PEOPLE_CONFIG_PATH, DEFAULT_HEADERS
-from utils.util import load_site, similarity_check
+from utils.util import load_site
 
 
-def get_transcript_urls(site_key: str, limit: int = 10) -> List[str]:
-    # 1) site_config 로드
-    configs = load_site(PEOPLE_CONFIG_PATH)
-    site_config = configs.get(site_key)
-    if not site_config:
-        raise ValueError(f"Site config for '{site_key}' not found.")
+class RollCallCrawler:
+    """Roll Call Factbase 데이터를 크롤링하는 클래스"""
 
-    base_url = site_config["base_url"].rstrip("/")
-    search_path = site_config.get("search_path",
-                                  site_config.get("search_url", "/factbase/trump/search/"))
-    wait_time = site_config.get("wait_time", 3)
-    anchor_sel = site_config.get("anchor_selector",
-                                 "a[href*='/factbase/trump/transcript/']")
-    button_text = site_config.get("button_text", "View Transcript")
+    DEFAULT_WAIT_TIME = 3
+    DEFAULT_BUTTON_TEXT = "View Transcript"
+    DEFAULT_ANCHOR_SELECTOR = "a[href*='/factbase/trump/transcript/']"
 
-    # 2) Selenium headless 브라우저 설정
-    opts = Options()
-    opts.headless = True
-    opts.add_argument("--disable-gpu")
-    opts.add_argument("--no-sandbox")
-    service = Service(ChromeDriverManager().install())
-    driver = webdriver.Chrome(service=service, options=opts)
+    def __init__(self, site_key: str = "rollcall", limit: int = 10) -> None:
+        self.site_key = site_key
+        self.limit = limit
+        self.config = self._load_config()
+        self.base_url = self.config["base_url"].rstrip("/")
+        self.search_url = self._build_search_url()
+        self.wait_time = self.config.get("wait_time", self.DEFAULT_WAIT_TIME)
+        self.anchor_selector = self.config.get("anchor_selector", self.DEFAULT_ANCHOR_SELECTOR)
+        self.button_text = self.config.get("button_text", self.DEFAULT_BUTTON_TEXT)
+        self.driver = self._init_driver()
 
-    try:
-        driver.get(base_url + search_path)
-        time.sleep(wait_time)  # JS 렌더링 대기
+    def _load_config(self) -> Dict:
+        config = load_site(PEOPLE_CONFIG_PATH).get(self.site_key)
+        if not config:
+            raise ValueError(f"Config for '{self.site_key}' not found")
+        return config
 
-        driver.find_element(By.XPATH, '// *[ @ id = "main"] / div[2] / div / div / form / div[3] / div[2] / div[1] / div[2] / select').click()
-        dropdown = Select(driver.find_element(By.XPATH, '// *[ @ id = "main"] / div[2] / div / div / form / div[3] / div[2] / div[1] / div[2] / select'))
-        time.sleep(wait_time)  # JS 렌더링 대기
-        dropdown.select_by_value('desc')
-        time.sleep(wait_time)  # JS 렌더링 대기
-        dropdown.select_by_value('asc')
-        time.sleep(wait_time)
+    def _build_search_url(self) -> str:
+        search_path = self.config.get("search_path", self.config.get("search_url", "/factbase/trump/search/"))
+        return f"{self.base_url}{search_path}"
 
-        # 스크롤 처리
-        last_height = driver.execute_script("return document.body.scrollHeight")
-        for _ in range(2):
-            driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-            time.sleep(wait_time)
-            new_height = driver.execute_script("return document.body.scrollHeight")
-            if new_height == last_height:
+    def _init_driver(self) -> webdriver.Chrome:
+        options = Options()
+        options.headless = True
+        options.add_argument("--disable-gpu")
+        options.add_argument("--no-sandbox")
+        return webdriver.Chrome(
+            service=Service(ChromeDriverManager().install()),
+            options=options
+        )
+
+    def get_urls(self) -> List[str]:
+        """트랜스크립트 URL 목록을 가져옴"""
+        self.driver.get(self.search_url)
+        time.sleep(self.wait_time)
+
+        self._handle_sort_dropdown()
+        self._scroll_to_bottom()
+
+        return self._extract_urls()
+
+    def _handle_sort_dropdown(self) -> None:
+        try:
+            dropdown = Select(self.driver.find_element(By.TAG_NAME, "select"))
+            dropdown.select_by_value("desc")
+            time.sleep(self.wait_time)
+            dropdown.select_by_value("asc")
+            time.sleep(self.wait_time)
+        except Exception:
+            pass  # 드롭다운이 없으면 무시
+
+    def _scroll_to_bottom(self, max_attempts: int = 3) -> None:
+        previous_height = 0
+        for _ in range(max_attempts):
+            self.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+            time.sleep(self.wait_time)
+            current_height = self.driver.execute_script("return document.body.scrollHeight")
+            if current_height == previous_height:
                 break
-            last_height = new_height
+            previous_height = current_height
 
-        elems = driver.find_elements(By.CSS_SELECTOR, anchor_sel)
+    def _extract_urls(self) -> List[str]:
         urls = []
-        for a in elems:
-            href = a.get_attribute("href") or ""
-            text = a.text.strip()
-            # 필터링
-            if not href.startswith("http"):
-                continue
-            if any(k in href for k in EXCLUDED_KEYWORDS):
-                continue
-            if button_text and button_text not in text:
-                continue
-
-            if href not in urls:
+        for anchor in self.driver.find_elements(By.CSS_SELECTOR, self.anchor_selector):
+            href = anchor.get_attribute("href") or ""
+            if (href.startswith("http") and
+                self.button_text in anchor.text and
+                not any(keyword in href for keyword in EXCLUDED_KEYWORDS) and
+                href not in urls):
                 urls.append(href)
-            if len(urls) >= limit:
-                break
-        print(f"총 URL 수: {len(urls)}")
+                if len(urls) >= self.limit:
+                    break
+        print(f"Total URLs found: {len(urls)}")
         return urls
 
-    finally:
-        driver.quit()
+    @staticmethod
+    def _fetch_soup(url: str) -> Optional[BeautifulSoup]:
+        try:
+            response = requests.get(url, headers=DEFAULT_HEADERS, timeout=10)
+            return BeautifulSoup(response.content, "html.parser") if response.ok else None
+        except requests.RequestException:
+            return None
 
-
-def get_rollcall_title(url: str) -> str:
-    try:
-        resp = requests.get(url, headers=DEFAULT_HEADERS, timeout=10)
-
-        if resp.status_code != 200:
-            print(f"❌ Failed to fetch URL ({resp.status_code}): {url}")
+    def get_title(self, url: str) -> str:
+        """페이지 제목을 추출"""
+        soup = self._fetch_soup(url)
+        if not soup:
             return ""
+        h1 = soup.select_one("h1.not-italic.font-semibold.leading-normal")
+        return h1.get_text(strip=True) if h1 else ""
 
-        if not resp.content.strip():
-            print(f"❌ Failed to fetch URL ({resp.status_code}): {url}")
-            return ""
+    def get_date(self, url: str) -> Optional[str]:
+        title = self.get_title(url)
+        if not title:
+            return None
 
-        soup = BeautifulSoup(resp.content, "html.parser")
-        content_blocks = soup.select('h1.not-italic.font-semibold.leading-normal')
-        title = None
+        # Pattern for 'Month Day, Year' (e.g., June 16, 1976)
+        date_pattern = r'([A-Za-z]+)\s+(\d{1,2}),\s+(\d{4})$'
+        match = re.search(date_pattern, title)
+        if not match:
+            return None
 
-        for block in content_blocks:
-            if block.name == "h1":
-                title = block.get_text(strip=True)
+        month_str, day, year = match.groups()
 
-        return title
-
-    except requests.RequestException as e:
-        print(f"HTTP error while extracting: {url}, error: {e}")
-        return ""
-    except Exception as e:
-        print(f"Failed to extract full text (parse error): {url}, error: {e}")
-        return ""
-
-
-def get_rollcall_text(url: str) -> str:
-    try:
-        resp = requests.get(url, headers=DEFAULT_HEADERS, timeout=10)
-
-        if resp.status_code != 200:
-            print(f"❌ Failed to fetch URL ({resp.status_code}): {url}")
-            return ""
-
-        if not resp.content.strip():
-            print(f"❌ Empty response received from: {url}")
-            return ""
-
-        soup = BeautifulSoup(resp.content, "html.parser")
-
-        content_blocks = soup.select('h2.text-md.inline, div.flex-auto.text-md.text-gray-600.leading-loose')
-
-        current_speaker = None
-        dialogue = []
-
-        for block in content_blocks:
-            if block.name == "h2":
-                current_speaker = block.get_text(strip=True)
-            elif block.name == "div":
-                if current_speaker:
-                    speech = block.get_text(strip=True)
-                    if speech:
-                        dialogue.append(f"{current_speaker}: {speech}")
-
-        full_text = "\n\n".join(dialogue)
-        return full_text
-
-    except requests.RequestException as e:
-        print(f"HTTP error while extracting: {url}, error: {e}")
-        return ""
-    except Exception as e:
-        print(f"Failed to extract full text (parse error): {url}, error: {e}")
-        return ""
-
-
-def get_type(t: str) -> str:
-    return t.strip().split(":")[0]
-
-
-def extract_rollcall_interview(urls: List[str], existing_articles: List[Dict]) -> List[Dict]:
-    seen_urls = set(a["url"] for a in existing_articles)
-    existing_texts = [a["text"] for a in existing_articles if a.get("text")]
-
-    new_articles = []
-
-    for url in urls:
-        if not isinstance(url, str) or not url.startswith("http"):
-            print(f"Skipping invalid URL: {url}")
-            continue
-        if url in seen_urls:
-            print(f"Duplicate URL skipped: {url}")
-            continue
-
-        full_text = get_rollcall_text(url).strip()
-        doc_type = get_type(get_rollcall_title(url))
-        text = []
-
-        # enumerate 사용 시 2개만 반환 (index, "text")
-        for i, block in enumerate(full_text.split("\n\n")):
-            block = block.strip()
-            if not block:
-                continue
-            text.append({
-                "id": i+1,
-                "text": block,
-                "sentiment": None,
-                "importance": None
-            })
-
-        # 변수 2개임
-        # similarity_check(
-        #     any(
-        #         full_text[:200] in text for text in existing_texts)
-        # )
-
-        new_article = {
-            "url": url,
-            "title": get_rollcall_title(url),
-            "text": text,
-            "source": url.split("/")[2],
-            "doc_type": doc_type
+        # Convert month name to number
+        month_map = {
+            'january': '01', 'february': '02', 'march': '03', 'april': '04',
+            'may': '05', 'june': '06', 'july': '07', 'august': '08',
+            'september': '09', 'october': '10', 'november': '11', 'december': '12'
         }
 
-        new_articles.append(new_article)
-        seen_urls.add(url)
-        existing_texts.append(full_text)
+        # Handle month names (case-insensitive)
+        month_str = month_str.lower()
+        for full_month, month_num in month_map.items():
+            if month_str.startswith(full_month[:3]):
+                month = month_num
+                break
+        else:
+            return None  # Invalid month name
 
-    return new_articles
+        # Format day to two digits
+        day = day.zfill(2)
+
+        # Validate date
+        try:
+            date_obj = datetime(int(year), int(month), int(day))
+            return date_obj.strftime('%Y-%m-%d')
+        except ValueError:
+            return None
+
+    def get_text(self, url: str) -> str:
+        """트랜스크립트 텍스트를 추출"""
+        soup = self._fetch_soup(url)
+        if not soup:
+            return ""
+
+        blocks = []
+        current_speaker = None
+        for tag in soup.select("h2.text-md.inline, div.flex-auto.text-md.text-gray-600.leading-loose"):
+            if tag.name == "h2":
+                current_speaker = tag.get_text(strip=True)
+            elif tag.name == "div" and current_speaker:
+                speech = tag.get_text(strip=True)
+                if speech:
+                    blocks.append(f"{current_speaker}: {speech}")
+        return "\n\n".join(blocks)
+
+    @staticmethod
+    def get_document_type(title: str) -> str:
+        """문서 유형을 결정"""
+        return title.split(":", 1)[0] if ":" in title else "article"
+
+    def extract_interviews(self, urls: List[str], existing: List[Dict]) -> List[Dict]:
+        """새로운 인터뷰 데이터를 추출"""
+        seen_urls = {article["url"] for article in existing}
+        new_articles = []
+
+        for url in urls:
+            if url in seen_urls:
+                continue
+
+            text = self.get_text(url).strip()
+            if not text:
+                continue
+
+            title = self.get_title(url)
+            doc_type = self.get_document_type(title)
+            date = self.get_date(url)
+
+            blocks = [
+                {"id": i + 1, "text": block.strip(), "sentiment": None, "importance": None}
+                for i, block in enumerate(text.split("\n\n")) if block.strip()
+            ]
+
+            new_articles.append({
+                "url": url,
+                "date": date,
+                "title": title,
+                "text": blocks,
+                "source": url.split("/")[2],
+                "doc_type": doc_type
+            })
+            seen_urls.add(url)
+            if len(new_articles) >= self.limit:
+                break
+
+        return new_articles
+
+    def close(self) -> None:
+        """드라이버 종료"""
+        self.driver.quit()

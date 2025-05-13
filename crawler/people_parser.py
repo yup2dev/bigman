@@ -1,7 +1,7 @@
 import re
+import time
 from datetime import datetime
 from typing import List, Dict, Optional
-import time
 import requests
 from bs4 import BeautifulSoup
 from selenium import webdriver
@@ -10,19 +10,17 @@ from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.select import Select
 from webdriver_manager.chrome import ChromeDriverManager
-
+from crawler.temp import UtteranceScorer
 from utils.constants import EXCLUDED_KEYWORDS, PEOPLE_CONFIG_PATH, DEFAULT_HEADERS
 from utils.util import load_site
 
 
 class RollCallCrawler:
-    """Roll Call Factbase 데이터를 크롤링하는 클래스"""
-
     DEFAULT_WAIT_TIME = 3
     DEFAULT_BUTTON_TEXT = "View Transcript"
     DEFAULT_ANCHOR_SELECTOR = "a[href*='/factbase/trump/transcript/']"
 
-    def __init__(self, site_key: str = "rollcall", limit: int = 1) -> None:
+    def __init__(self, site_key: str = "rollcall", limit: int = 5) -> None:
         self.site_key = site_key
         self.limit = limit
         self.config = self._load_config()
@@ -32,6 +30,8 @@ class RollCallCrawler:
         self.anchor_selector = self.config.get("anchor_selector", self.DEFAULT_ANCHOR_SELECTOR)
         self.button_text = self.config.get("button_text", self.DEFAULT_BUTTON_TEXT)
         self.driver = self._init_driver()
+        self.utterance_scorer = UtteranceScorer()
+        self.interview_extractor = InterviewExtractor(self.utterance_scorer, limit=self.limit)
 
     def _load_config(self) -> Dict:
         config = load_site(PEOPLE_CONFIG_PATH).get(self.site_key)
@@ -54,13 +54,10 @@ class RollCallCrawler:
         )
 
     def get_urls(self) -> List[str]:
-        """트랜스크립트 URL 목록을 가져옴"""
         self.driver.get(self.search_url)
         time.sleep(self.wait_time)
-
         self._handle_sort_dropdown()
         self._scroll_to_bottom()
-
         return self._extract_urls()
 
     def _handle_sort_dropdown(self) -> None:
@@ -71,7 +68,7 @@ class RollCallCrawler:
             dropdown.select_by_value("asc")
             time.sleep(self.wait_time)
         except Exception:
-            pass  # 드롭다운이 없으면 무시
+            pass
 
     def _scroll_to_bottom(self, max_attempts: int = 2) -> None:
         previous_height = 0
@@ -106,7 +103,6 @@ class RollCallCrawler:
             return None
 
     def get_title(self, url: str) -> str:
-        """페이지 제목을 추출"""
         soup = self._fetch_soup(url)
         if not soup:
             return ""
@@ -117,35 +113,23 @@ class RollCallCrawler:
         title = self.get_title(url)
         if not title:
             return None
-
-        # Pattern for 'Month Day, Year' (e.g., June 16, 1976)
-        date_pattern = r'([A-Za-z]+)\s+(\d{1,2}),\s+(\d{4})$'
-        match = re.search(date_pattern, title)
+        match = re.search(r'([A-Za-z]+)\s+(\d{1,2}),\s+(\d{4})$', title)
         if not match:
             return None
-
         month_str, day, year = match.groups()
-
-        # Convert month name to number
         month_map = {
             'january': '01', 'february': '02', 'march': '03', 'april': '04',
             'may': '05', 'june': '06', 'july': '07', 'august': '08',
             'september': '09', 'october': '10', 'november': '11', 'december': '12'
         }
-
-        # Handle month names (case-insensitive)
         month_str = month_str.lower()
         for full_month, month_num in month_map.items():
             if month_str.startswith(full_month[:3]):
                 month = month_num
                 break
         else:
-            return None  # Invalid month name
-
-        # Format day to two digits
+            return None
         day = day.zfill(2)
-
-        # Validate date
         try:
             date_obj = datetime(int(year), int(month), int(day))
             return date_obj.strftime('%Y-%m-%d')
@@ -153,11 +137,9 @@ class RollCallCrawler:
             return None
 
     def get_text(self, url: str) -> str:
-        """트랜스크립트 텍스트를 추출"""
         soup = self._fetch_soup(url)
         if not soup:
             return ""
-
         blocks = []
         current_speaker = None
         for tag in soup.select("h2.text-md.inline, div.flex-auto.text-md.text-gray-600.leading-loose"):
@@ -171,11 +153,28 @@ class RollCallCrawler:
 
     @staticmethod
     def get_document_type(title: str) -> str:
-        """문서 유형을 결정"""
         return title.split(":", 1)[0] if ":" in title else "article"
 
     def extract_interviews(self, urls: List[str], existing: List[Dict]) -> List[Dict]:
-        """새로운 인터뷰 데이터를 추출"""
+        return self.interview_extractor.extract(
+            urls,
+            existing,
+            self.get_text,
+            self.get_title,
+            self.get_date,
+            self.get_document_type
+        )
+
+    def close(self) -> None:
+        self.driver.quit()
+
+
+class InterviewExtractor:
+    def __init__(self, utterance_scorer: UtteranceScorer, limit: int = 10):
+        self.utterance_scorer = utterance_scorer
+        self.limit = limit
+
+    def extract(self, urls: List[str], existing: List[Dict], get_text, get_title, get_date, get_document_type) -> List[Dict]:
         seen_urls = {article["url"] for article in existing}
         new_articles = []
 
@@ -183,18 +182,28 @@ class RollCallCrawler:
             if url in seen_urls:
                 continue
 
-            text = self.get_text(url).strip()
+            text = get_text(url).strip()
             if not text:
                 continue
 
-            title = self.get_title(url)
-            doc_type = self.get_document_type(title)
-            date = self.get_date(url)
+            title = get_title(url)
+            doc_type = get_document_type(title)
+            date = get_date(url)
 
-            blocks = [
-                {"id": i + 1, "text": block.strip(), "sentiment": None, "importance": None}
-                for i, block in enumerate(text.split("\n\n")) if block.strip()
-            ]
+            blocks = []
+            for i, block in enumerate(text.split("\n\n")):
+                if not block.strip():
+                    continue
+                scores = self.utterance_scorer.score(block.strip())
+                blocks.append({
+                    "id": i + 1,
+                    "text": block.strip(),
+                    "emotion_arousal": scores.get("emotion_arousal", 0.0),
+                    "keyword_rarity": scores.get("keyword_rarity", 0.0),
+                    "structural_emphasis": scores.get("structural_emphasis", 0.0),
+                    "sentiment": None,
+                    "importance": None
+                })
 
             new_articles.append({
                 "url": url,
@@ -204,12 +213,9 @@ class RollCallCrawler:
                 "source": url.split("/")[2],
                 "doc_type": doc_type
             })
+
             seen_urls.add(url)
             if len(new_articles) >= self.limit:
                 break
 
         return new_articles
-
-    def close(self) -> None:
-        """드라이버 종료"""
-        self.driver.quit()

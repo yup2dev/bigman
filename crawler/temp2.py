@@ -1,75 +1,80 @@
 import re
 import numpy as np
-import pandas as pd
-import spacy
+from typing import Dict
 from nltk.tokenize import word_tokenize
 from wordfreq import word_frequency
+import pandas as pd
 
-nlp = spacy.load("en_core_web_sm")
 
+class EmotionLexicon:
+    def __init__(self, vad_path: str = "NRC-VAD-Lexicon-v2.1.txt"):
+        self.vad_dict = self._load_vad_lexicon(vad_path)
 
-def load_vad_lexicon(filepath: str = "NRC-VAD-Lexicon-v2.1.txt") -> dict:
-    df = pd.read_csv(filepath, sep='\t')
-    vad_dict = {
-        row['term']: {
-            'valence': row['valence'],
-            'arousal': row['arousal'],
-            'dominance': row['dominance']
+    def _load_vad_lexicon(self, path: str) -> Dict[str, Dict[str, float]]:
+        df = pd.read_csv(path, sep='\t')
+        return {
+            row['term']: {
+                'valence': row['valence'],
+                'arousal': row['arousal'],
+                'dominance': row['dominance']
+            }
+            for _, row in df.iterrows()
         }
-        for _, row in df.iterrows()
-    }
-    return vad_dict
+
+    def get_arousal(self, text: str) -> float:
+        words = word_tokenize(text.lower())
+        arousal_scores = [self.vad_dict[w]['arousal'] for w in words if w in self.vad_dict]
+        return np.mean(arousal_scores) if arousal_scores else 0.0
 
 
-VAD_DICT = load_vad_lexicon()
+class KeywordRarityCalculator:
+    def __init__(self, lang: str = 'en'):
+        self.lang = lang
+
+    def calculate_rarity(self, text: str) -> float:
+        words = word_tokenize(text.lower())
+        if not words:
+            return 0.0
+        freq_scores = [1 - word_frequency(w, self.lang) for w in words if word_frequency(w, self.lang) > 0]
+        return np.mean(freq_scores) if freq_scores else 0.0
+
+
+class StructuralEmphasisDetector:
+    def __init__(self):
+        self.exclam_pattern = re.compile(r"!+")
+        self.repetition_pattern = re.compile(r"\b(\w+)\s+\1\b", re.IGNORECASE)
+
+    def compute_emphasis(self, text: str) -> float:
+        if not text.strip():
+            return 0.0
+
+        total_words = len(word_tokenize(text))
+        if total_words == 0:
+            return 0.0
+
+        emph_count = 0
+
+        # 1. 대문자 단어 (강조)
+        emph_count += sum(1 for word in text.split() if word.isupper() and len(word) > 1)
+
+        # 2. 감탄사 사용
+        emph_count += len(self.exclam_pattern.findall(text))
+
+        # 3. 반복 단어 (like "very very good")
+        emph_count += len(self.repetition_pattern.findall(text))
+
+        return emph_count / total_words
 
 
 class UtteranceScorer:
-    @staticmethod
-    def compute_emotion_arousal(text: str) -> float:
-        words = word_tokenize(text.lower())
-        scores = [VAD_DICT[w]['arousal'] for w in words if w in VAD_DICT]
-        return round(sum(scores) / len(scores), 3) if scores else 0.0
+    def __init__(self, vad_path: str = "NRC-VAD-Lexicon-v2.1.txt"):
+        self.emotion_lexicon = EmotionLexicon(vad_path)
+        self.keyword_rarity = KeywordRarityCalculator()
+        self.structural_emphasis = StructuralEmphasisDetector()
 
-    @staticmethod
-    def compute_keyword_rarity(text: str, lang='en') -> float:
-        words = word_tokenize(text.lower())
-        freqs = [word_frequency(w, lang) for w in words if w.isalpha()]
-        rarity_scores = [-np.log10(f) if f > 0 else 0 for f in freqs]
-        return round(np.mean(rarity_scores), 3) if rarity_scores else 0.0
-
-    @staticmethod
-    def compute_structural_emphasis(text: str) -> float:
-        patterns = [
-            r'\b[A-Z]{2,}\b',  # ALL CAPS
-            r'!+',  # exclamations
-            r'\.{2,}',  # ...
-            r'\b(\w+)\s+\1\b'  # repeated words
-        ]
-        base_score = sum(len(re.findall(p, text)) for p in patterns)
-
-        doc = nlp(text)
-        discourse_markers = sum(1 for t in doc if t.text.lower() in ['but', 'however', 'really', 'very'])
-
-        total_score = base_score + discourse_markers
-        word_count = len([t for t in doc if t.is_alpha])
-        return round(min(total_score / word_count, 1.0), 3) if word_count else 0.0
-
-    @staticmethod
-    def compute_memorability(arousal: float, rarity: float, emphasis: float) -> float:
-        return round(0.5 * arousal + 0.3 * rarity + 0.2 * emphasis, 3)
-
-
-# 사용 예시
-if __name__ == "__main__":
-    text = "Well no not really. I had a great faith in New York, primarily our purchases have been in New York, and at the... about five years ago in New York was not considered very hot and cities in general weren't considered too hot. And we purchased the old Commodore Hotel and we have reconverted that now into about a $110 million Grand Hyatt Hotel which is opening up next week in New York City, and we've made some other purchases that have been fine."
-
-    arousal = UtteranceScorer.compute_emotion_arousal(text)
-    rarity = UtteranceScorer.compute_keyword_rarity(text)
-    emphasis = UtteranceScorer.compute_structural_emphasis(text)
-    memorability = UtteranceScorer.compute_memorability(arousal, rarity, emphasis)
-
-    print(f"emotion_arousal: {arousal}")
-    print(f"keyword_rarity: {rarity}")
-    print(f"structural_emphasis: {emphasis}")
-    print(f"memorability_score: {memorability}")
+    def score(self, text: str) -> Dict[str, float]:
+        return {
+            "emotion_arousal": self.emotion_lexicon.get_arousal(text),
+            "keyword_rarity": self.keyword_rarity.calculate_rarity(text),
+            "structural_emphasis": self.structural_emphasis.compute_emphasis(text)
+        }

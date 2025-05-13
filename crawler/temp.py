@@ -1,172 +1,80 @@
-from typing import List, Dict, Optional
-import liwc
-import re
-# import lexicon
+import re, os
+import numpy as np
+import pandas as pd
+from nltk.tokenize import word_tokenize
+from wordfreq import word_frequency
 
 
-class LIWCAnalyzer:
-    """Compute LIWC-based cognitive and emotion ratios using the liwc library."""
-    def __init__(self, dict_path: str = 'LIWC2007_English100131.dic'):
-        """
-        Initialize the LIWC analyzer by loading the LIWC dictionary file.
-        :param dict_path: Path to the LIWC dictionary (.dic) file
-        """
-        # liwc.load_token_parser returns (categories, dictionary) parser
-        self.categories, self.token_parser = liwc.load_token_parser(dict_path)
+# 🔹 감정 각성 사전 기반
+class NRCEmotionArousal:
+    def __init__(self, vad_path: str = "NRC-VAD-Lexicon-v2.1.txt"):
+        abs_path = os.path.join(os.path.dirname(__file__), vad_path)
+        self.vad = self._load_vad(abs_path)
 
-    def analyze(self, text: str) -> Dict[str, float]:
-        """
-        Analyze the text and return the proportion of tokens in cognitive and emotion categories.
-        :param text: Input text to analyze
-        :return: Dict with 'liwc_cognitive' and 'liwc_emotion' ratios
-        """
-        # Tokenize input text
-        tokens = re.findall(r"\w+", text.lower())
-        total = len(tokens) or 1
-        # Parse tokens to LIWC categories
-        counts = {'cognitive': 0, 'emotion': 0}
-        for token in tokens:
-            for cat in self.token_parser(token):
-                # token_parser returns category strings
-                if cat.lower() in self.categories:
-                    # Check category hierarchy for cognitive and emotion
-                    if cat.startswith('Cogmech') or cat.lower() == 'cognitive':
-                        counts['cognitive'] += 1
-                    if cat.startswith('Affect') or cat.lower() == 'emotion':
-                        counts['emotion'] += 1
-        return {
-            'liwc_cognitive': counts['cognitive'] / total,
-            'liwc_emotion': counts['emotion'] / total
-        }
-
-
-# The rest of the feature processors remain unchanged
-class EmotionArousalScorer:
-    """Compute emotion arousal score based on intensity keywords or lexicon."""
-    def __init__(self, arousal_lexicon: Dict[str, float]):
-        self.lexicon = arousal_lexicon
+    def _load_vad(self, path: str):
+        df = pd.read_csv(path, sep='\t')
+        return {row['term']: row['arousal'] for _, row in df.iterrows()}
 
     def score(self, text: str) -> float:
-        tokens = re.findall(r"\w+", text.lower())
-        if not tokens:
-            return 0.0
-        total = len(tokens)
-        score_sum = sum(self.lexicon.get(t, 0.0) for t in tokens)
-        return score_sum / total
+        words = word_tokenize(text.lower())
+        scores = [self.vad[w] for w in words if w in self.vad]
+        return round(np.mean(scores), 4) if scores else 0.0
 
 
-class KeywordRarityScorer:
-    """Compute rarity of keywords in a text against a corpus frequency dict."""
-    def __init__(self, corpus_freq: Dict[str, int], total_tokens: int):
-        self.corpus_freq = corpus_freq
-        self.total_tokens = total_tokens
+# 🔹 wordfreq 기반 희귀도 계산
+class WordfreqRarity:
+    def __init__(self, lang='en'):
+        self.lang = lang
 
     def score(self, text: str) -> float:
-        tokens = re.findall(r"\w+", text.lower())
-        if not tokens:
-            return 0.0
-        rarities = []
-        for t in tokens:
-            freq = self.corpus_freq.get(t, 0)
-            # Rarity = 1 - normalized frequency
-            rarities.append(1 - (freq / self.total_tokens))
-        return sum(rarities) / len(rarities)
+        words = word_tokenize(text.lower())
+        scores = [1 - word_frequency(w, self.lang) for w in words if word_frequency(w, self.lang) > 0]
+        return round(np.mean(scores), 4) if scores else 0.0
 
 
-class StructuralEmphasisScorer:
-    """Compute structural emphasis based on Q&A, repetition, or emphasis patterns."""
+# 🔹 강조 표현: 감탄사/대문자/반복 단어
+class EmphasisDetector:
     def __init__(self):
-        pass
+        self.exclam_pattern = re.compile(r"[!]{1,}")
+        self.repeat_pattern = re.compile(r"\b(\w+)\s+\1\b", re.IGNORECASE)
+        self.strong_words = {'really', 'very', 'absolutely', 'totally', 'so', 'too'}
 
     def score(self, text: str) -> float:
-        score = 0.0
-        # Q&A pattern
-        if re.search(r"\?:", text):
-            score += 0.2
-        # repetition pattern
-        if len(set(text.lower().split())) < len(text.split()):
-            score += 0.2
-        # emphasis words
-        emphasis_words = ['really', 'very', 'absolutely']
-        tokens = text.lower().split()
-        score += sum(0.1 for t in tokens if t in emphasis_words)
-        return min(score, 1.0)
+        if not text.strip():
+            return 0.0
+
+        words = word_tokenize(text)
+        total = len(words)
+        if total == 0:
+            return 0.0
+
+        emph_count = 0
+
+        # 대문자 단어
+        emph_count += sum(1 for w in words if w.isupper() and len(w) > 1)
+
+        # 반복 단어
+        emph_count += len(self.repeat_pattern.findall(text))
+
+        # 감탄사
+        emph_count += len(self.exclam_pattern.findall(text))
+
+        # 강조 부사
+        emph_count += sum(1 for w in words if w.lower() in self.strong_words)
+
+        return round(emph_count / total, 4)
 
 
-class MemorabilityCalculator:
-    """Combine arousal, rarity, structure into a single memorability score."""
-    def __init__(self, weights: Optional[Dict[str, float]] = None):
-        self.weights = weights or {'arousal': 0.4, 'rarity': 0.3, 'structure': 0.3}
+# 🔹 통합 스코어러
+class UtteranceScorer:
+    def __init__(self, vad_path="NRC-VAD-Lexicon-v2.1.txt"):
+        self.emotion_model = NRCEmotionArousal(vad_path)
+        self.rarity_model = WordfreqRarity()
+        self.emphasis_model = EmphasisDetector()
 
-    def compute(self, arousal: float, rarity: float, structure: float) -> float:
-        return (self.weights['arousal'] * arousal +
-                self.weights['rarity'] * rarity +
-                self.weights['structure'] * structure)
-
-
-class EventMapper:
-    """Map an utterance to an event type using embedding similarity or classifier."""
-    def __init__(self, event_db: List[Dict], embedder):
-        self.event_db = event_db
-        self.embedder = embedder
-
-    def map(self, text: str, date: str) -> Dict:
-        utter_emb = self.embedder.embed(text)
-        best = {'event_id': None, 'type': None, 'confidence': 0.0}
-        for evt in self.event_db:
-            evt_emb = self.embedder.embed(evt['description'])
-            sim = sum(u * v for u, v in zip(utter_emb, evt_emb))
-            if sim > best['confidence']:
-                best = {'event_id': evt['event_id'], 'type': evt['type'], 'confidence': sim}
-        return best
-
-
-class DataSetProcessor:
-    """Orchestrates feature extraction and event mapping for transcripts."""
-    def __init__(
-        self,
-        liwc_dict_path: str,
-        arousal_lexicon: Dict[str, float],
-        corpus_freq: Dict[str, int],
-        total_tokens: int,
-        event_db: List[Dict],
-        embedder
-    ):
-        self.liwc = LIWCAnalyzer(liwc_dict_path)
-        self.arousal = EmotionArousalScorer(arousal_lexicon)
-        self.rarity = KeywordRarityScorer(corpus_freq, total_tokens)
-        self.structure = StructuralEmphasisScorer()
-        self.memo = MemorabilityCalculator()
-        self.mapper = EventMapper(event_db, embedder)
-
-    def process(self, transcript: Dict) -> Dict:
-        processed = {
-            'url': transcript['url'],
-            'date': transcript['date'],
-            'title': transcript['title'],
-            'text': []
+    def score(self, text: str):
+        return {
+            "emotion_arousal": self.emotion_model.score(text),
+            "keyword_rarity": self.rarity_model.score(text),
+            "structural_emphasis": self.emphasis_model.score(text)
         }
-        for utt in transcript['text']:
-            text = utt['text']
-            liwc_feats = self.liwc.analyze(text)
-            arousal_score = self.arousal.score(text)
-            rarity_score = self.rarity.score(text)
-            structure_score = self.structure.score(text)
-            mem_score = self.memo.compute(arousal_score, rarity_score, structure_score)
-            event = self.mapper.map(text, transcript['date'])
-
-            entry = {
-                'id': utt['id'],
-                'speaker': utt.get('speaker'),
-                'utterance': text,
-                **liwc_feats,
-                'stance_label': utt.get('stance_label'),
-                'emotion_arousal': arousal_score,
-                'keyword_rarity': rarity_score,
-                'structural_emphasis': structure_score,
-                'memorability_score': mem_score,
-                'memory_id': f"M{transcript['date'][:10].replace('-', '')}_{utt['id']:02d}",
-                'mapped_event': event
-            }
-            processed['text'].append(entry)
-        return processed

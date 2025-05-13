@@ -1,10 +1,12 @@
 from typing import List, Dict, Optional
-import re
 import liwc
+import re
+# import lexicon
+
 
 class LIWCAnalyzer:
     """Compute LIWC-based cognitive and emotion ratios using the liwc library."""
-    def __init__(self, dict_path: str):
+    def __init__(self, dict_path: str = 'LIWC2007_English100131.dic'):
         """
         Initialize the LIWC analyzer by loading the LIWC dictionary file.
         :param dict_path: Path to the LIWC dictionary (.dic) file
@@ -37,6 +39,7 @@ class LIWCAnalyzer:
             'liwc_emotion': counts['emotion'] / total
         }
 
+
 # The rest of the feature processors remain unchanged
 class EmotionArousalScorer:
     """Compute emotion arousal score based on intensity keywords or lexicon."""
@@ -50,6 +53,7 @@ class EmotionArousalScorer:
         total = len(tokens)
         score_sum = sum(self.lexicon.get(t, 0.0) for t in tokens)
         return score_sum / total
+
 
 class KeywordRarityScorer:
     """Compute rarity of keywords in a text against a corpus frequency dict."""
@@ -67,6 +71,7 @@ class KeywordRarityScorer:
             # Rarity = 1 - normalized frequency
             rarities.append(1 - (freq / self.total_tokens))
         return sum(rarities) / len(rarities)
+
 
 class StructuralEmphasisScorer:
     """Compute structural emphasis based on Q&A, repetition, or emphasis patterns."""
@@ -87,6 +92,7 @@ class StructuralEmphasisScorer:
         score += sum(0.1 for t in tokens if t in emphasis_words)
         return min(score, 1.0)
 
+
 class MemorabilityCalculator:
     """Combine arousal, rarity, structure into a single memorability score."""
     def __init__(self, weights: Optional[Dict[str, float]] = None):
@@ -96,6 +102,7 @@ class MemorabilityCalculator:
         return (self.weights['arousal'] * arousal +
                 self.weights['rarity'] * rarity +
                 self.weights['structure'] * structure)
+
 
 class EventMapper:
     """Map an utterance to an event type using embedding similarity or classifier."""
@@ -113,7 +120,8 @@ class EventMapper:
                 best = {'event_id': evt['event_id'], 'type': evt['type'], 'confidence': sim}
         return best
 
-class TranscriptProcessor:
+
+class DataSetProcessor:
     """Orchestrates feature extraction and event mapping for transcripts."""
     def __init__(
         self,

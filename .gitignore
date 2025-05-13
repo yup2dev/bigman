@@ -84,4 +84,4 @@ dist/
 *.jsonl
 data/
 log/
-
+*.txt

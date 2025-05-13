@@ -22,7 +22,7 @@ class RollCallCrawler:
     DEFAULT_BUTTON_TEXT = "View Transcript"
     DEFAULT_ANCHOR_SELECTOR = "a[href*='/factbase/trump/transcript/']"
 
-    def __init__(self, site_key: str = "rollcall", limit: int = 10) -> None:
+    def __init__(self, site_key: str = "rollcall", limit: int = 1) -> None:
         self.site_key = site_key
         self.limit = limit
         self.config = self._load_config()
@@ -73,7 +73,7 @@ class RollCallCrawler:
         except Exception:
             pass  # 드롭다운이 없으면 무시
 
-    def _scroll_to_bottom(self, max_attempts: int = 3) -> None:
+    def _scroll_to_bottom(self, max_attempts: int = 2) -> None:
         previous_height = 0
         for _ in range(max_attempts):
             self.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")

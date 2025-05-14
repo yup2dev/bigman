@@ -1,8 +1,9 @@
 import re
 import numpy as np
-from typing import Dict
+from typing import Dict, List
 from nltk.tokenize import word_tokenize
 from wordfreq import word_frequency
+from empath import Empath
 import pandas as pd
 
 
@@ -66,11 +67,32 @@ class StructuralEmphasisDetector:
         return emph_count / total_words
 
 
+
+class EmpathAnalyzer:
+    def __init__(self, include: List[str] = None, exclude: List[str] = None, threshold: float = 0.0):
+        self.lexicon = Empath()
+        all_categories = set(self.lexicon.cats)
+        self.include = set(include) if include else all_categories
+        self.exclude = set(exclude) if exclude else set()
+        self.threshold = threshold
+
+        self.categories = sorted(list(self.include - self.exclude))
+
+    def analyze(self, text: str) -> Dict[str, float]:
+        scores = self.lexicon.analyze(text, normalize=True, categories=self.categories)
+        return {
+            category: round(score, 4)
+            for category, score in scores.items()
+            if score >= self.threshold
+        }
+
+
 class UtteranceScorer:
     def __init__(self, vad_path: str = "NRC-VAD-Lexicon-v2.1.txt"):
         self.emotion_lexicon = EmotionLexicon(vad_path)
         self.keyword_rarity = KeywordRarityCalculator()
         self.structural_emphasis = StructuralEmphasisDetector()
+        self.analyzer = EmpathAnalyzer(threshold=0.05)
 
     def score(self, text: str) -> Dict[str, float]:
         return {

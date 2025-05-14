@@ -1,6 +1,9 @@
 import re, os
+from typing import List, Dict
+
 import numpy as np
 import pandas as pd
+from empath import Empath
 from nltk.tokenize import word_tokenize
 from wordfreq import word_frequency
 
@@ -63,6 +66,30 @@ class EmphasisDetector:
         emph_count += sum(1 for w in words if w.lower() in self.strong_words)
 
         return round(emph_count / total, 4)
+
+
+class EmpathAnalyzer:
+    def __init__(self, include: List[str] = None, exclude: List[str] = None, threshold: float = 0.0):
+        self.lexicon = Empath()
+        self.all_categories = set(self.lexicon.cats)
+        self.include = set(include) if include else self.all_categories
+        self.exclude = set(exclude) if exclude else set()
+        self.threshold = threshold
+
+        self.categories = sorted(list(self.include - self.exclude))
+
+    def analyze(self, text: str) -> Dict:
+        scores = self.lexicon.analyze(text, normalize=True, categories=self.categories)
+        results = []
+        for category, score in scores.items():
+            if score >= self.threshold:
+                keywords = [w for w in text.lower().split() if category in self.lexicon.cats_for_word(w)]
+                results.append({
+                    "category": category,
+                    "score": round(score, 4),
+                    "keywords": keywords
+                })
+        return {"categories": results}
 
 
 # 🔹 통합 스코어러

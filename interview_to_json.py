@@ -64,7 +64,7 @@ def process_site(site_key: str, limit: int = 5) -> None:
 def main():
     sites_config = load_site(PEOPLE_CONFIG_PATH)
     for site_key in sites_config:
-        process_site(site_key, limit=10)
+        process_site(site_key, limit=1)
 
 
 if __name__ == "__main__":

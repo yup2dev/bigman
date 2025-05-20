@@ -1,6 +1,9 @@
 import json
 import time, re, os, yaml
 from datetime import datetime
+
+import openai
+from dotenv import load_dotenv
 from newspaper import Article
 from typing import List, Dict
 from sklearn.feature_extraction.text import TfidfVectorizer
@@ -92,3 +95,10 @@ def similarity_check(current_text: str, existing_texts: List[str], similarity_th
         print(f"중복 감지 (유사도: {max_similarity:.4f})")
         return True
     return False
+
+
+def ensure_openai_api_key():
+    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    dotenv_path = os.path.join(base_dir, ".env")
+    load_dotenv(dotenv_path)
+    openai.api_key = os.getenv("OPENAI_API_KEY")

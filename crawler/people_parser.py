@@ -10,8 +10,9 @@ from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.select import Select
 from webdriver_manager.chrome import ChromeDriverManager
-from crawler.temp import UtteranceScorer
-from crawler.temp2 import EmpathAnalyzer
+
+from crawler.gpt_inferncer import GPTUtteranceInterpreter
+from crawler.scrap_summary import UtteranceScorer, EmpathAnalyzer
 from utils.constants import EXCLUDED_KEYWORDS, PEOPLE_CONFIG_PATH, DEFAULT_HEADERS
 from utils.util import load_site
 
@@ -21,7 +22,7 @@ class RollCallCrawler:
     DEFAULT_BUTTON_TEXT = "View Transcript"
     DEFAULT_ANCHOR_SELECTOR = "a[href*='/factbase/trump/transcript/']"
 
-    def __init__(self, site_key: str = "rollcall", limit: int = 5) -> None:
+    def __init__(self, site_key: str = "rollcall", limit: int = 10) -> None:
         self.site_key = site_key
         self.limit = limit
         self.config = self._load_config()
@@ -33,7 +34,8 @@ class RollCallCrawler:
         self.driver = self._init_driver()
         self.utterance_scorer = UtteranceScorer()
         self.empath_analyzer = EmpathAnalyzer(threshold=0.05)
-        self.interview_extractor = InterviewExtractor(self.utterance_scorer, self.empath_analyzer, limit=self.limit)
+        self.gpt_interpreter = GPTUtteranceInterpreter()
+        self.interview_extractor = InterviewExtractor(self.utterance_scorer, self.empath_analyzer, self.gpt_interpreter, limit=self.limit)
 
     def _load_config(self) -> Dict:
         config = load_site(PEOPLE_CONFIG_PATH).get(self.site_key)
@@ -172,9 +174,13 @@ class RollCallCrawler:
 
 
 class InterviewExtractor:
-    def __init__(self, utterance_scorer: UtteranceScorer, empath_analyzer: EmpathAnalyzer, limit: int = 10):
+    def __init__(self, utterance_scorer: UtteranceScorer
+                     , empath_analyzer: EmpathAnalyzer
+                     , gpt_interpreter: GPTUtteranceInterpreter
+                     , limit: int = 10):
         self.utterance_scorer = utterance_scorer
         self.empath_analyzer = empath_analyzer
+        self.gpt_interpreter = gpt_interpreter
         self.limit = limit
 
     def extract(self, urls: List[str], existing: List[Dict], get_text, get_title, get_date, get_document_type) -> List[Dict]:
@@ -199,6 +205,7 @@ class InterviewExtractor:
                     continue
                 scores = self.utterance_scorer.score(block.strip())
                 result = self.empath_analyzer.analyze(block.strip())
+                gpt_result = self.gpt_interpreter.extract_intent_and_keywords(block.strip())
                 blocks.append({
                     "id": i + 1,
                     "text": block.strip(),
@@ -207,7 +214,9 @@ class InterviewExtractor:
                     "structural_emphasis": scores.get("structural_emphasis", 0.0),
                     "sentiment": None,
                     "importance": None,
-                    "empath": result
+                    "empath": result,
+                    "intent": gpt_result.get("intent"),
+                    "keywords": gpt_result.get("keywords", [])
                 })
 
             new_articles.append({

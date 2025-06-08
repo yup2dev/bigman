@@ -1,94 +1,76 @@
 import os
-import json
-import logging
-from datetime import datetime
-from analyzer.nlp_processor import NLPProcessor
+import torch
+from transformers import T5Tokenizer, T5ForConditionalGeneration, Trainer, TrainingArguments
+from sklearn.model_selection import train_test_split
 
-# 로깅 설정
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(levelname)s - %(message)s",
-    handlers=[
-        logging.StreamHandler(),  # 콘솔 출력
-        logging.FileHandler("../log/generate_training_data.log", encoding="utf-8")  # 로그 파일 저장
-    ]
-)
-logger = logging.getLogger(__name__)
-
-# 스크랩 데이터 Article 배열로 변환
-def load_articles_from_directory(date_folder: str):
-    all_articles = []
-    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    directory = os.path.join(base_dir, "data", "processed", date_folder)
-
-    if not os.path.exists(directory):
-        logger.error(f"지정된 폴더가 존재하지 않습니다: {directory}")
-        return []
-
-    logger.info(f"폴더 스캔 시작: {directory}")
-    files = [f for f in os.listdir(directory) if f.endswith(".json")]
-    logger.info(f"JSON 파일 {len(files)}개 발견")
-
-    for filename in files:
-        filepath = os.path.join(directory, filename)
-        try:
-            with open(filepath, 'r', encoding='utf-8') as f:
-                content = json.load(f)
-                if isinstance(content, list):
-                    all_articles.extend(content)
-                elif isinstance(content, dict):
-                    all_articles.append(content)
-                else:
-                    logger.warning(f"무시됨 (지원되지 않는 형식): {filename}")
-        except Exception as e:
-            logger.error(f"파일 읽기 실패: {filename} | {e}")
-
-    logger.info(f"처리 완료: 총 {len(all_articles)}개 기사 수집됨")
-    return all_articles
+from analyzer.nlp_processor import PolicyPredictionDataset
+from utils.constants import PROCESSED_DATA_DIR
+from utils.util import load_json
+import sys
 
 
-def process_articles_by_date(date_input: str = None):
-    if not date_input:
-        date_input = datetime.today().strftime('%Y-%m-%d')
-        logger.info(f"오늘 날짜 기준 실행: {date_input}")
-    else:
-        try:
-            datetime.strptime(date_input, '%Y-%m-%d')
-        except ValueError:
-            logger.error(f"날짜 형식 오류 (YYYY-MM-DD 형식 필요): {date_input}")
-            return
 
-    logger.info(f"기사 분석 시작일: {date_input}")
-    articles = load_articles_from_directory(date_input)
-    logger.info(f"총 {len(articles)}개 기사 로드됨")
+def train_t5_from_dataset(subdir: str, model_name: str = "t5-small", output_dir: str = "./t5_policy_output"):
+    """
+    하위 폴더 안의 JSON 파일을 자동으로 찾아 T5 모델 학습을 수행하는 함수
+    """
 
-    if not articles:
-        logger.warning("분석할 기사가 없습니다.")
+    folder_path = os.path.join(PROCESSED_DATA_DIR, subdir)
+
+    # 폴더 내 JSON 파일 탐색
+    json_files = [f for f in os.listdir(folder_path) if f.endswith(".json")]
+    if not json_files:
+        print(f"❌ JSON 파일을 찾을 수 없습니다: {folder_path}")
         return
 
-    nlp = NLPProcessor(model="gpt-3.5-turbo")
+    # 가장 첫 번째 JSON 파일을 선택 (또는 원하는 기준 정렬 가능)
+    json_file = json_files[0]
+    dataset_path = os.path.join(folder_path, json_file)
+    print(f"📦 데이터 로딩 중: {dataset_path}")
 
-    success_count = 0
-    failure_count = 0
+    raw_data = load_json(dataset_path)
+    if not raw_data:
+        print("❌ 데이터가 없거나 파일 로딩에 실패했습니다.")
+        return
 
-    for i, article in enumerate(articles):
-        logger.info(f"[{i+1}/{len(articles)}] 제목: {article.get('title', '제목 없음')}")
+    # 모델 및 토크나이저 로드
+    tokenizer = T5Tokenizer.from_pretrained(model_name)
+    model = T5ForConditionalGeneration.from_pretrained(model_name)
 
-        try:
-            result = nlp.process_article(article)
-            if result:
-                events = result.get("events", [])
-                logger.info(f"분석 성공: {len(events)}개 이벤트 추출됨")
-                success_count += 1
-            else:
-                logger.warning(f"분석 실패 - 파일명 또는 URL: {article.get('url', '알 수 없음')}")
-                failure_count += 1
-        except Exception as e:
-            logger.error(f"기사 분석 중 오류 발생: {e}")
-            failure_count += 1
+    # 학습/검증 분리
+    train_data, val_data = train_test_split(raw_data, test_size=0.1, random_state=42)
 
-    logger.info(f"분석 완료 요약: 성공 {success_count}건 | 실패 {failure_count}건")
+    # 데이터셋 구성
+    train_dataset = PolicyPredictionDataset(train_data, tokenizer)
+    val_dataset = PolicyPredictionDataset(val_data, tokenizer)
+
+    # 학습 인자 설정
+    training_args = TrainingArguments(
+        output_dir=output_dir,
+        num_train_epochs=5,
+        per_device_train_batch_size=4,
+        per_device_eval_batch_size=4,
+        eval_steps=100,
+        logging_steps=50,
+        save_steps=200,
+        evaluation_strategy="epoch",
+        save_total_limit=2,
+        fp16=torch.cuda.is_available()
+    )
+
+    # Trainer 실행
+    trainer = Trainer(
+        model=model,
+        args=training_args,
+        train_dataset=train_dataset,
+        eval_dataset=val_dataset
+    )
+
+    print("🚀 학습 시작...")
+    trainer.train()
+    print("✅ 학습 완료.")
 
 
 if __name__ == "__main__":
-    process_articles_by_date("2025-04-19")
+    # 예시: data/processed/1976 폴더 내 JSON 파일 자동 선택
+    train_t5_from_dataset(subdir="1976")

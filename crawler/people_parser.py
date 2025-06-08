@@ -1,5 +1,4 @@
-import re
-import time
+import time, re
 from datetime import datetime
 from typing import List, Dict, Optional
 import requests
@@ -11,6 +10,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.select import Select
 from webdriver_manager.chrome import ChromeDriverManager
 
+from crawler.SpeechBlockSegmenter import SpeechBlockSegmenter
 from crawler.gpt_inferncer import GPTUtteranceInterpreter
 from crawler.scrap_summary import UtteranceScorer, EmpathAnalyzer
 from utils.constants import EXCLUDED_KEYWORDS, PEOPLE_CONFIG_PATH, DEFAULT_HEADERS
@@ -22,8 +22,9 @@ class RollCallCrawler:
     DEFAULT_BUTTON_TEXT = "View Transcript"
     DEFAULT_ANCHOR_SELECTOR = "a[href*='/factbase/trump/transcript/']"
 
-    def __init__(self, site_key: str = "rollcall", limit: int = 10) -> None:
+    def __init__(self, site_key: str = "rollcall", start_year: int = 1000, limit: int = 10) -> None:
         self.site_key = site_key
+        self.start_year = start_year
         self.limit = limit
         self.config = self._load_config()
         self.base_url = self.config["base_url"].rstrip("/")
@@ -35,7 +36,8 @@ class RollCallCrawler:
         self.utterance_scorer = UtteranceScorer()
         self.empath_analyzer = EmpathAnalyzer(threshold=0.05)
         self.gpt_interpreter = GPTUtteranceInterpreter()
-        self.interview_extractor = InterviewExtractor(self.utterance_scorer, self.empath_analyzer, self.gpt_interpreter, limit=self.limit)
+        self.block_segmentor = SpeechBlockSegmenter()
+        self.interview_extractor = InterviewExtractor(self.utterance_scorer, self.empath_analyzer, self.gpt_interpreter, self.block_segmentor, limit=self.limit)
 
     def _load_config(self) -> Dict:
         config = load_site(PEOPLE_CONFIG_PATH).get(self.site_key)
@@ -57,12 +59,36 @@ class RollCallCrawler:
             options=options
         )
 
-    def get_urls(self) -> List[str]:
+    def get_urls(self, start_year: Optional[int] = None) -> List[str]:
+        """
+        검색 페이지에서 URL을 추출하며, start_year를 지정하면 해당 연도 이후만 필터링함.
+        """
         self.driver.get(self.search_url)
         time.sleep(self.wait_time)
         self._handle_sort_dropdown()
         self._scroll_to_bottom()
-        return self._extract_urls()
+
+        all_urls = self._extract_urls()
+        if not start_year:
+            return all_urls[:self.limit]
+
+        filtered_urls = []
+        for url in all_urls:
+            date_str = self.get_date(url)
+            if not date_str:
+                continue
+            try:
+                year = int(date_str.split("-")[0])
+                if year >= start_year:
+                    filtered_urls.append(url)
+            except ValueError:
+                continue
+
+            if len(filtered_urls) >= self.limit:
+                break
+
+        print(f"📅 {start_year}년 이후 URL 수: {len(filtered_urls)}")
+        return filtered_urls
 
     def _handle_sort_dropdown(self) -> None:
         try:
@@ -172,64 +198,112 @@ class RollCallCrawler:
     def close(self) -> None:
         self.driver.quit()
 
-
 class InterviewExtractor:
-    def __init__(self, utterance_scorer: UtteranceScorer
-                     , empath_analyzer: EmpathAnalyzer
-                     , gpt_interpreter: GPTUtteranceInterpreter
-                     , limit: int = 10):
+    def __init__(self, utterance_scorer, empath_analyzer, gpt_interpreter, block_segmenter, limit: int = 10):
         self.utterance_scorer = utterance_scorer
         self.empath_analyzer = empath_analyzer
         self.gpt_interpreter = gpt_interpreter
+        self.block_segmenter = block_segmenter
         self.limit = limit
 
-    def extract(self, urls: List[str], existing: List[Dict], get_text, get_title, get_date, get_document_type) -> List[Dict]:
+    def extract(self, urls, existing, get_text, get_title, get_date, get_document_type):
         seen_urls = {article["url"] for article in existing}
-        new_articles = []
+        results = []
 
         for url in urls:
             if url in seen_urls:
                 continue
 
-            text = get_text(url).strip()
-            if not text:
+            try:
+                full_text = get_text(url).strip()
+            except Exception as e:
+                print(f"Error fetching text for {url}: {e}")
                 continue
 
-            title = get_title(url)
-            doc_type = get_document_type(title)
-            date = get_date(url)
+            if not full_text:
+                continue
 
-            blocks = []
-            for i, block in enumerate(text.split("\n\n")):
-                if not block.strip():
-                    continue
-                scores = self.utterance_scorer.score(block.strip())
-                result = self.empath_analyzer.analyze(block.strip())
-                gpt_result = self.gpt_interpreter.extract_intent_and_keywords(block.strip())
-                blocks.append({
-                    "id": i + 1,
-                    "text": block.strip(),
-                    "emotion_arousal": scores.get("emotion_arousal", 0.0),
-                    "keyword_rarity": scores.get("keyword_rarity", 0.0),
-                    "structural_emphasis": scores.get("structural_emphasis", 0.0),
-                    "sentiment": None,
-                    "importance": None,
-                    "empath": result,
-                    "intent": gpt_result.get("intent"),
-                    "keywords": gpt_result.get("keywords", [])
-                })
+            try:
+                title = get_title(url)
+                date = get_date(url)
+                doc_type = get_document_type(title)
+            except Exception as e:
+                print(f"Error fetching metadata for {url}: {e}")
+                continue
 
-            new_articles.append({
-                "url": url,
-                "date": date,
-                "title": title,
-                "text": blocks,
-                "source": url.split("/")[2],
-                "doc_type": doc_type
-            })
+            segments = self._parse_segments(full_text)
+
+            if doc_type.lower() == "interview":
+                blocks = self.block_segmenter.segment_as_qa_pairs(segments)
+            else:
+                blocks = [[seg] for seg in segments if seg.get("text")]
+
+            for i, block in enumerate(blocks):
+                if len(results) >= self.limit:
+                    break
+                result = self._process_block(block, url, date, doc_type, i)
+                if result:
+                    results.append(result)
 
             seen_urls.add(url)
-            if len(new_articles) >= self.limit:
+            if len(results) >= self.limit:
                 break
 
-        return new_articles
+        return results
+
+    def _parse_segments(self, full_text):
+        segments = []
+        for block in full_text.split("\n\n"):
+            if not block.strip():
+                continue
+            match = re.match(r"^(.*?):\s*(.*)", block.strip(), re.DOTALL)
+            if match:
+                speaker, text = match.groups()
+            else:
+                speaker, text = None, block.strip()
+            segments.append({"speaker": speaker, "text": text})
+        return segments
+
+    def _process_block(self, block, url, date, doc_type, i):
+        speaker = block[0].get("speaker", "Unknown")
+        combined_text = " ".join(seg["text"] for seg in block).strip()
+        if not combined_text:
+            return None
+
+        scores = self.utterance_scorer.score(combined_text)
+        empath = self.empath_analyzer.analyze(combined_text)
+        sentiment = self.gpt_interpreter.analyze_sentiment(combined_text)
+        tone_label = self.gpt_interpreter.classify_tone(combined_text)
+        arousal = scores.get("emotion_arousal", 0.0)
+
+        conditions, conclusion = self.gpt_interpreter.extract_conditions_and_conclusion(combined_text)
+        persona = self.gpt_interpreter.infer_persona(conditions, conclusion, sentiment["label"], arousal, empath)
+        policy_result = self.gpt_interpreter.extract_policies_and_effects(combined_text)
+
+        predicted_policies = policy_result.get("predicted_policies", [])
+        expected_effects = policy_result.get("expected_effects", [])
+        # TODO: Implement a better selection criterion for best_policy
+        best_policy = predicted_policies[0] if predicted_policies else None
+
+        result = {
+            "id": f"{url.split('/')[-1]}_{i+1}",
+            "datetime": date,
+            "doc_type": doc_type,
+            "context": [{"speaker": seg["speaker"], "text": seg["text"]} for seg in block],
+            "parsed": {
+                "conditions": conditions,
+                "conclusion": conclusion,
+                "answer_type": "conditional" if "if" in combined_text.lower() else "assertive"
+            },
+            "empath": empath,
+            "emotion_arousal": arousal,
+            "tone": tone_label,
+            "persona": persona,
+            "predicted_policies": predicted_policies,
+            "expected_effects": expected_effects,
+            "labels": {
+                "predicted_best_policy": best_policy,
+                "historical_alignment": self.gpt_interpreter.validate_policy(best_policy) if best_policy else 0.0
+            }
+        }
+        return result

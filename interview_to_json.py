@@ -19,12 +19,12 @@ def load_existing_articles(site_key: str, date_str: str) -> list:
     return []
 
 
-def process_site(site_key: str, limit: int = 5) -> None:
+def process_site(site_key: str, limit) -> None:
     print(f"🔍 Starting article collection for {site_key}")
     crawler = None
 
     try:
-        crawler = RollCallCrawler(site_key=site_key, limit=limit)
+        crawler = RollCallCrawler(site_key=site_key, start_year= 1981,  limit=limit)
         urls = crawler.get_urls()
 
         if not urls:
@@ -64,7 +64,7 @@ def process_site(site_key: str, limit: int = 5) -> None:
 def main():
     sites_config = load_site(PEOPLE_CONFIG_PATH)
     for site_key in sites_config:
-        process_site(site_key, limit=1)
+        process_site(site_key, limit=3)
 
 
 if __name__ == "__main__":
